@@ -1,0 +1,1978 @@
+<!doctype html>
+<html lang="yue-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>粉絲陪伴卡</title>
+    <!-- 本頁唔載入任何外部資源（包括網絡字體）：全部用系統字體。
+         之前試過延後注入網絡字體，喺字體服務長時間無回應嘅設備上
+         仍然會卡住渲染、令頁面一直白屏。零外部請求，先保證開得到。 -->
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #faf3ec;
+        --surface: #fffdf9;
+        --surface-2: #f6e9dc;
+        --ink: #3b2d26;
+        --ink-soft: #7a6558;
+        --line: #e8d8c8;
+        --accent: #c05f33;
+        --accent-ink: #ffffff;
+        --accent-soft: #f9e3d3;
+        --sage: #5f7d5a;
+        --sage-soft: #e4edda;
+        --gold: #b98a2f;
+        --gold-soft: #f7ecd2;
+        --rose: #b5503f;
+        --rose-soft: #f9ded6;
+        --shadow: 0 10px 28px rgba(120, 72, 40, 0.10);
+        --radius: 18px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #201914;
+          --surface: #2c221b;
+          --surface-2: #382b21;
+          --ink: #f3e7da;
+          --ink-soft: #c2ab97;
+          --line: #4a382b;
+          --accent: #e08a5c;
+          --accent-ink: #2a1a10;
+          --accent-soft: #4a3121;
+          --sage: #a9c79b;
+          --sage-soft: #33402c;
+          --gold: #e0bc6a;
+          --gold-soft: #453a20;
+          --rose: #e89a87;
+          --rose-soft: #472b24;
+          --shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        }
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Noto Sans TC", "PingFang HK", "PingFang TC", "PingFang SC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 1020px; margin: 0 auto; padding: 20px 16px 56px; }
+
+      /* ---------- 載入提示列（純 HTML/CSS，唔靠腳本都會顯示） ---------- */
+      .bootbar {
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+        padding: 9px 14px; margin-bottom: 14px; font-size: 0.88rem; color: var(--ink-soft);
+      }
+      .bootbar a {
+        color: var(--accent); font-weight: 700; text-decoration: none;
+        border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; background: var(--surface-2);
+      }
+      .noscript-note {
+        background: var(--gold-soft); border-radius: 12px; padding: 12px 14px;
+        font-size: 0.9rem; margin-bottom: 14px;
+      }
+
+      /* ---------- 經期預測頂部提醒 ---------- */
+      .period-banner {
+        display: none;
+        background: var(--rose-soft);
+        border: 1px solid var(--rose);
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+      }
+      .period-banner.show { display: block; }
+      .period-banner .pb-title { font-weight: 700; color: var(--rose); margin: 0 0 2px; }
+      .period-banner .pb-text { margin: 0; font-size: 0.95rem; }
+      .period-banner .pb-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+      .period-banner .pb-actions a {
+        color: var(--rose); font-weight: 700; text-decoration: none; font-size: 0.88rem;
+        border: 1px solid var(--rose); border-radius: 999px; padding: 4px 12px;
+      }
+
+      /* ---------- 問候 / 每日一句 ---------- */
+      .hello { padding: 10px 2px 4px; }
+      .hello .date { color: var(--ink-soft); font-size: 0.88rem; letter-spacing: 0.04em; }
+      .hello h1 {
+        font-family: "Noto Serif TC", "Songti TC", "Songti SC", "PMingLiU", serif;
+        font-size: clamp(1.55rem, 5.4vw, 2.2rem);
+        margin: 4px 0 6px; line-height: 1.3; font-weight: 700;
+      }
+      .hello p { margin: 0; color: var(--ink-soft); max-width: 34em; }
+      .daily {
+        margin-top: 18px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 20px 22px;
+        display: flex; gap: 16px; align-items: flex-start;
+      }
+      .daily .mark {
+        flex: none; width: 42px; height: 42px; border-radius: 12px;
+        background: var(--accent-soft); color: var(--accent);
+        display: grid; place-items: center;
+      }
+      .daily .label { font-size: 0.8rem; color: var(--ink-soft); letter-spacing: 0.12em; }
+      .daily .line {
+        font-family: "LXGW WenKai TC", "Noto Serif TC", "Songti TC", "Songti SC", "PMingLiU", serif;
+        font-size: clamp(1.15rem, 4.4vw, 1.45rem);
+        margin-top: 2px; line-height: 1.55;
+      }
+
+      /* ---------- 快速跳轉 ---------- */
+      .jump { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 4px; }
+      .jump a {
+        text-decoration: none; color: var(--ink);
+        background: var(--surface); border: 1px solid var(--line);
+        padding: 7px 14px; border-radius: 999px; font-size: 0.9rem; font-weight: 500;
+      }
+      .jump a:active { background: var(--surface-2); }
+
+      /* ---------- 區塊 ---------- */
+      .grid { display: grid; gap: 18px; margin-top: 16px; }
+      @media (min-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } .span2 { grid-column: span 2; } }
+      section.card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 22px;
+        scroll-margin-top: 14px;
+      }
+      section.card h2 {
+        font-family: "Noto Serif TC", "Songti TC", "Songti SC", "PMingLiU", serif;
+        font-size: 1.28rem; margin: 0 0 4px; display: flex; align-items: center; gap: 10px;
+      }
+      section.card h2 .ic {
+        width: 34px; height: 34px; border-radius: 10px; flex: none;
+        display: grid; place-items: center;
+      }
+      section.card h3.subhead {
+        font-size: 1.05rem; margin: 20px 0 4px; display: flex; align-items: center; gap: 8px;
+        font-family: "Noto Serif TC", "Songti TC", serif;
+      }
+      .ic.terra { background: var(--accent-soft); color: var(--accent); }
+      .ic.sage { background: var(--sage-soft); color: var(--sage); }
+      .ic.gold { background: var(--gold-soft); color: var(--gold); }
+      .ic.rose { background: var(--rose-soft); color: var(--rose); }
+      section.card .sub { color: var(--ink-soft); font-size: 0.92rem; margin: 0 0 16px; }
+      .flash { outline: 3px solid var(--accent); outline-offset: 2px; transition: outline-color 0.4s ease; }
+
+      button {
+        font: inherit; cursor: pointer; border: none; border-radius: 12px;
+        padding: 10px 18px; font-weight: 700;
+        background: var(--accent); color: var(--accent-ink);
+        transition: transform 0.08s ease, opacity 0.15s ease;
+      }
+      button:active { transform: scale(0.97); }
+      button.ghost { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+      button.small { padding: 7px 13px; font-size: 0.88rem; border-radius: 10px; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      input, textarea, select {
+        font: inherit; color: var(--ink);
+        background: var(--bg); border: 1px solid var(--line);
+        border-radius: 10px; padding: 9px 12px; width: 100%;
+      }
+      input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      label.flabel { display: block; font-size: 0.85rem; color: var(--ink-soft); margin: 12px 0 5px; }
+      .form-grid { display: grid; gap: 0 10px; }
+      @media (min-width: 560px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+      .hint { font-size: 0.85rem; color: var(--ink-soft); margin: 8px 0 0; }
+
+      /* ---------- 安慰 ---------- */
+      .moods { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+      .moods button {
+        background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); font-weight: 500;
+      }
+      .moods button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+      .comfort-box {
+        background: var(--accent-soft);
+        border-radius: 14px; padding: 22px 20px; min-height: 118px;
+        display: flex; flex-direction: column; justify-content: center;
+      }
+      .comfort-text {
+        font-family: "LXGW WenKai TC", "Noto Serif TC", "Songti TC", "Songti SC", "PMingLiU", serif;
+        font-size: clamp(1.12rem, 4.2vw, 1.35rem); line-height: 1.6; margin: 0;
+      }
+      .comfort-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+      .fadein { animation: fadein 0.45s ease; }
+      @keyframes fadein { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+      /* ---------- 骰仔 ---------- */
+      .dice-row { display: flex; gap: 14px; justify-content: center; padding: 10px 0 4px; min-height: 84px; align-items: center; flex-wrap: wrap; }
+      .die {
+        width: 68px; height: 68px; border-radius: 14px;
+        background: var(--surface-2); border: 1.5px solid var(--line);
+        display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+        padding: 11px;
+      }
+      .die i { width: 11px; height: 11px; border-radius: 50%; background: var(--ink); place-self: center; visibility: hidden; }
+      .die i.show { visibility: visible; }
+      .die.rolling { animation: shake 0.12s linear infinite; }
+      @keyframes shake {
+        0% { transform: rotate(-4deg) translateY(0); }
+        50% { transform: rotate(4deg) translateY(-3px); }
+        100% { transform: rotate(-3deg) translateY(1px); }
+      }
+      .dice-total { text-align: center; font-size: 1.05rem; min-height: 1.7em; }
+      .dice-total b { color: var(--accent); font-size: 1.3rem; }
+      .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 3px; gap: 3px; }
+      .seg button { background: transparent; color: var(--ink-soft); padding: 6px 14px; border-radius: 9px; font-weight: 500; }
+      .seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 5px rgba(0,0,0,0.12); font-weight: 700; }
+      .divider { border: none; border-top: 1px dashed var(--line); margin: 20px 0; }
+      .decision-result {
+        text-align: center; font-family: "LXGW WenKai TC", "Noto Serif TC", "Songti TC", "Songti SC", "PMingLiU", serif;
+        font-size: clamp(1.3rem, 5vw, 1.7rem); min-height: 1.6em; padding: 8px 0 2px; color: var(--accent);
+      }
+      .center { text-align: center; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .row > * { flex: none; }
+      .grow { flex: 1 1 auto !important; }
+
+      /* ---------- 轉盤 ---------- */
+      .wheel-stage { position: relative; width: min(300px, 78vw); margin: 6px auto 4px; aspect-ratio: 1; }
+      .wheel-stage canvas { width: 100%; height: 100%; display: block; }
+      .wheel-pointer {
+        position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+        width: 0; height: 0; z-index: 2;
+        border-left: 13px solid transparent; border-right: 13px solid transparent;
+        border-top: 22px solid var(--accent);
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+      }
+      .wheel-hub {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 54px; height: 54px; border-radius: 50%;
+        background: var(--surface); border: 2px solid var(--line);
+        display: grid; place-items: center; font-weight: 700; font-size: 0.82rem; color: var(--accent);
+        box-shadow: var(--shadow); pointer-events: none; text-align: center; line-height: 1.25;
+      }
+      .wheel-result {
+        text-align: center; font-family: "LXGW WenKai TC", "Noto Serif TC", serif;
+        font-size: clamp(1.25rem, 5vw, 1.6rem); min-height: 1.6em; color: var(--accent); margin-top: 6px;
+      }
+      .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+      .presets button { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+      .presets button.on { background: var(--sage); color: #fff; border-color: transparent; }
+      @media (prefers-color-scheme: dark) { .presets button.on { color: #1d2618; } }
+
+      /* ---------- 鬧鐘 / 倒計時 ---------- */
+      .alarm-item {
+        display: flex; align-items: center; gap: 12px;
+        background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+        padding: 10px 14px; margin-top: 8px;
+      }
+      .alarm-item .time { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .alarm-item .lab { color: var(--ink-soft); font-size: 0.9rem; }
+      .alarm-item .del { margin-left: auto; background: transparent; color: var(--rose); padding: 6px 8px; font-weight: 500; }
+      .alarm-empty { color: var(--ink-soft); font-size: 0.92rem; margin-top: 8px; }
+      .note {
+        background: var(--gold-soft); border-radius: 12px; padding: 12px 14px;
+        font-size: 0.88rem; margin-top: 16px; color: var(--ink);
+      }
+      .timer-face { text-align: center; padding: 6px 0 2px; }
+      .timer-face .clock {
+        font-size: clamp(2.4rem, 10vw, 3.2rem); font-weight: 700;
+        font-variant-numeric: tabular-nums; letter-spacing: 0.03em; line-height: 1.15;
+      }
+      .timer-face .tstate { color: var(--ink-soft); font-size: 0.9rem; min-height: 1.5em; }
+      .presets-min { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+      .presets-min button { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+
+      /* ---------- 呼吸 ---------- */
+      .breath-stage { display: grid; place-items: center; padding: 14px 0 6px; }
+      .breath-circle {
+        width: 150px; height: 150px; border-radius: 50%;
+        background: radial-gradient(circle at 35% 32%, var(--sage-soft), var(--sage));
+        display: grid; place-items: center;
+        color: #fff; font-family: "LXGW WenKai TC", serif; font-size: 1.25rem;
+        transform: scale(0.72);
+        box-shadow: 0 12px 30px rgba(80, 110, 70, 0.30);
+      }
+      @media (prefers-color-scheme: dark) { .breath-circle { color: #16240f; } }
+      .breath-count { text-align: center; color: var(--ink-soft); font-size: 0.9rem; min-height: 1.5em; }
+
+      /* ---------- 經期 ---------- */
+      .predict-box {
+        background: var(--rose-soft); border-radius: 14px; padding: 16px 18px; margin-top: 14px;
+      }
+      .predict-box .pb-big {
+        font-family: "Noto Serif TC", serif; font-size: 1.15rem; line-height: 1.55; margin: 0;
+      }
+      .predict-box .pb-small { color: var(--ink-soft); font-size: 0.88rem; margin: 6px 0 0; }
+      .record-item {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+        padding: 9px 14px; margin-top: 8px;
+      }
+      .record-item .rdate { font-weight: 700; font-variant-numeric: tabular-nums; }
+      .record-item .rtag { color: var(--ink-soft); font-size: 0.88rem; }
+      .record-item .del { margin-left: auto; background: transparent; color: var(--rose); padding: 6px 8px; font-weight: 500; }
+
+      /* ---------- 記賬 ---------- */
+      .ledger-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+      .ledger-tabs button { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+      .ledger-tabs button.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+      .sum-row { display: grid; gap: 10px; margin-top: 14px; }
+      @media (min-width: 560px) { .sum-row { grid-template-columns: repeat(3, 1fr); } }
+      .sum-box { background: var(--surface-2); border-radius: 12px; padding: 12px 14px; }
+      .sum-box .sl { font-size: 0.82rem; color: var(--ink-soft); }
+      .sum-box .sv { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .sum-box .sv.in { color: var(--sage); }
+      .sum-box .sv.out { color: var(--rose); }
+      .tx-item {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+        padding: 9px 14px; margin-top: 8px;
+      }
+      .tx-item .tcat { font-weight: 700; }
+      .tx-item .tmeta { color: var(--ink-soft); font-size: 0.85rem; display: block; }
+      .tx-item .tamt { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .tx-item .tamt.in { color: var(--sage); }
+      .tx-item .tamt.out { color: var(--rose); }
+      .tx-item .del { background: transparent; color: var(--rose); padding: 6px 8px; font-weight: 500; }
+      .goal-card {
+        background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
+        padding: 16px; margin-top: 12px;
+      }
+      .goal-card .ghead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+      .goal-card .gname { font-weight: 700; font-size: 1.05rem; }
+      .goal-card .gamt { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 0.92rem; }
+      .goal-card .gamt b { color: var(--ink); font-size: 1.1rem; }
+      .progress { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin: 10px 0 4px; }
+      .progress i { display: block; height: 100%; background: var(--sage); border-radius: 999px; transition: width 0.4s ease; }
+      .goal-card .gpct { font-size: 0.85rem; color: var(--ink-soft); }
+      .goal-card .del { background: transparent; color: var(--rose); padding: 6px 8px; font-weight: 500; }
+
+      /* ---------- 搜尋 ---------- */
+      .search-result {
+        display: block; width: 100%; text-align: left;
+        background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+        padding: 10px 14px; margin-top: 8px; color: var(--ink); font-weight: 500;
+      }
+      .search-result .rk { font-size: 0.78rem; color: var(--accent); font-weight: 700; letter-spacing: 0.06em; display: block; }
+      .search-result .rb { color: var(--ink-soft); font-size: 0.88rem; display: block; margin-top: 2px; font-weight: 400; }
+      .search-empty { color: var(--ink-soft); font-size: 0.92rem; margin-top: 12px; }
+      .weblink {
+        display: inline-block; text-decoration: none;
+        background: var(--accent); color: var(--accent-ink);
+        padding: 10px 18px; border-radius: 12px; font-weight: 700;
+      }
+      .weblink:active { transform: scale(0.97); }
+
+      /* ---------- 鬧鐘彈窗 ---------- */
+      .overlay {
+        position: fixed; inset: 0; z-index: 60;
+        background: rgba(30, 18, 10, 0.55);
+        display: none; place-items: center; padding: 20px;
+      }
+      .overlay.show { display: grid; }
+      .overlay .box {
+        background: var(--surface); border-radius: 20px; padding: 28px 24px;
+        max-width: 340px; width: 100%; text-align: center; box-shadow: var(--shadow);
+        animation: pulse 1s ease infinite alternate;
+      }
+      @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.02); } }
+      .overlay .big { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .overlay .lab { font-family: "LXGW WenKai TC", serif; font-size: 1.2rem; margin: 4px 0 18px; }
+      footer { text-align: center; color: var(--ink-soft); font-size: 0.85rem; margin-top: 30px; }
+      .toast {
+        position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px);
+        background: var(--ink); color: var(--bg); padding: 9px 18px; border-radius: 999px;
+        font-size: 0.9rem; opacity: 0; pointer-events: none; transition: all 0.25s ease; z-index: 70;
+        max-width: 92vw; text-align: center;
+      }
+      .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+      @media (prefers-reduced-motion: reduce) {
+        .die.rolling, .overlay .box, .fadein { animation: none; }
+        html { scroll-behavior: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="bootbar">
+        <span>王大偉張陪伴卡已經載入晒，向下碌就見到全部功能。</span>
+        <a href="?fresh=1">重新載入</a>
+      </div>
+      <p class="noscript-note" id="storageWarn" style="display:none;">提你一句：呢部機嘅瀏覽器唔肯存記錄，經期、記賬同存款今次記得低，一閂頁面就會冇返。唔係我唔肯幫你記，係部機唔畀。</p>
+      <noscript>
+        <p class="noscript-note">你部機暫時行唔到頁面腳本：下面嘅問候、每日一句同各區文字都照樣睇得到；但抽安慰說話、掟骰仔、轉盤、鬧鐘、經期同記賬啲掣，要有腳本先用到。試下撳上面「重新載入」，或者閂咗張卡再開過。</p>
+      </noscript>
+
+      <!-- 經期預測頂部提醒（預測前三日先顯示，冇嘢顯示嗰陣自動隱藏） -->
+      <div class="period-banner" id="periodBanner" role="status">
+        <p class="pb-title" id="periodBannerTitle">就快到日子，自己留意。</p>
+        <p class="pb-text" id="periodBannerText"></p>
+        <div class="pb-actions">
+          <a href="#period">去經期嗰區睇清楚</a>
+          <a href="#" id="periodBannerHide">知喇，收起佢</a>
+        </div>
+      </div>
+
+      <header class="hello">
+        <div class="date" id="todayDate">今日</div>
+        <h1 id="greeting">坐低。搞掂今日先，其他嘢之後再講</h1>
+        <p>嚟到就坐低。唔開心可以講，唔想講都得。呢度冇人氹你，我亦唔氹——我淨係做兩件事：幫你搞掂啲事，同睇實你。喺我面前，唔使死撐。</p>
+        <div class="daily">
+          <div class="mark" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s-7.5-4.7-10-9C.3 8.9 1.7 5 5.2 5c2 0 3.4 1.1 4.3 2.4h5c.9-1.3 2.3-2.4 4.3-2.4 3.5 0 4.9 3.9 3.2 7-2.5 4.3-10 9-10 9z" transform="scale(0.92) translate(1,0)"/></svg>
+          </div>
+          <div>
+            <div class="label">每 日 一 句</div>
+            <div class="line" id="dailyLine">攰就瞓，餓就食。簡單嘅事，唔好諗到咁複雜。</div>
+          </div>
+        </div>
+      </header>
+
+      <nav class="jump" aria-label="功能導覽">
+        <a href="#search">搜尋</a>
+        <a href="#websearch">聯網搜尋</a>
+        <a href="#comfort">撳開就攬下</a>
+        <a href="#dice">掟骰仔</a>
+        <a href="#wheel">大轉盤</a>
+        <a href="#timer">鬧鐘 · 倒計時</a>
+        <a href="#breath">唞下氣</a>
+        <a href="#period">經期記錄</a>
+        <a href="#money">記賬 · 存款</a>
+      </nav>
+
+      <div class="grid">
+        <!-- 搜尋 -->
+        <section class="card span2" id="search">
+          <h2><span class="ic terra"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></svg></span>搜尋</h2>
+          <p class="sub">打關鍵字，即刻幫你喺成張卡度搵：安慰說話、每日一句、轉盤選項，仲有每區去到邊。撳結果就跳過去，唔使自己碌嚟碌去咁辛苦。想上網搵出面嘅嘢，就去下一個分區。</p>
+          <input type="search" id="searchInput" placeholder="例如：瞓覺、食飯、經期、儲錢……" aria-label="搜尋關鍵字" />
+          <div id="searchResults"></div>
+          <p class="search-empty" id="searchEmpty">打字嗰陣，結果會即刻出嚟。</p>
+        </section>
+
+        <!-- 聯網搜尋 -->
+        <section class="card span2" id="websearch">
+          <h2><span class="ic sage"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></span>聯網搜尋</h2>
+          <p class="sub">卡入面冇嘅，出面搵。打低你想搵嘅嘢，條連結會即刻跟住你打嘅字更新；撳落去，就會用瀏覽器開必應（Bing）嘅搜尋結果版面。唔使我教你點打字啦啩。</p>
+          <label class="flabel" for="webSearchInput">想上網搵咩</label>
+          <input type="search" id="webSearchInput" placeholder="例如：經期食咩好、點樣儲錢……" aria-label="聯網搜尋關鍵字" />
+          <div class="row" style="margin-top:12px;">
+            <a class="weblink" id="webSearchLink" href="https://www.bing.com/" target="_blank" rel="noopener">打開必應搜尋</a>
+          </div>
+          <p class="hint" id="webSearchHint">打字嗰陣，上面條連結會即刻變成搜你打嗰樣嘢。</p>
+        </section>
+
+        <!-- 安慰 -->
+        <section class="card span2" id="comfort">
+          <h2><span class="ic terra"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19.8 5.1a5 5 0 0 0-7.1 0l-.7.7-.7-.7a5 5 0 1 0-7.1 7.1l7.8 7.8 7.8-7.8a5 5 0 0 0 0-7.1z"/></svg></span>撳開就攬下</h2>
+          <p class="sub">揀下你而家咩感覺先。唔好講冇事，我睇得出。抽一句，收好，唔使回我。</p>
+          <div class="moods" id="moodBtns" role="group" aria-label="揀心情"></div>
+          <div class="comfort-box">
+            <p class="comfort-text" id="comfortText">撳下面個掣。我講，你聽。聽完，照做。</p>
+          </div>
+          <div class="comfort-actions">
+            <button id="drawComfort">畀句說話我</button>
+            <button class="ghost" id="copyComfort">複製呢句</button>
+          </div>
+        </section>
+
+        <!-- 骰仔 -->
+        <section class="card" id="dice">
+          <h2><span class="ic gold"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.4" fill="currentColor" stroke="none"/></svg></span>掟骰仔</h2>
+          <p class="sub">掟幾粒隨你，點數我幫你加。輸贏唔好太上心——真正緊要嘅事，從來都唔靠骰仔。</p>
+          <div class="center">
+            <div class="seg" id="diceCount" role="group" aria-label="骰仔數量">
+              <button data-n="1" class="on">1 粒</button>
+              <button data-n="2">2 粒</button>
+              <button data-n="3">3 粒</button>
+            </div>
+          </div>
+          <div class="dice-row" id="diceRow"></div>
+          <div class="dice-total" id="diceTotal">撳「掟骰仔」開始</div>
+          <div class="center"><button id="rollDice">掟骰仔</button></div>
+
+          <hr class="divider" />
+          <h2 style="font-size:1.12rem;"><span class="ic rose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>決定骰</h2>
+          <p class="sub">諗嚟諗去係浪費時間。將啲選項交畀我，我拍板。揀錯咗算我嘅，你唔使孭，亦唔使再諗第二轉。</p>
+          <label class="flabel" for="decisionOpts">選項（一行一個）</label>
+          <textarea id="decisionOpts" rows="3">而家即刻去做
+等一陣先
+問下朋友點睇
+今晚早啲瞓，聽朝再諗</textarea>
+          <div class="decision-result" id="decisionResult">佢會幫你揀一個</div>
+          <div class="center"><button id="rollDecision">幫我決定</button></div>
+        </section>
+
+        <!-- 轉盤 -->
+        <section class="card" id="wheel">
+          <h2><span class="ic sage"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l7.8 4.5M12 12L4.2 16.5"/></svg></span>大轉盤</h2>
+          <p class="sub">揀唔出就唔好揀。轉盤停喺邊，就係邊。慳返啲腦力，留嚟做正經事。</p>
+          <div class="presets" id="wheelPresets" role="group" aria-label="轉盤主題"></div>
+          <div class="wheel-stage">
+            <div class="wheel-pointer" aria-hidden="true"></div>
+            <canvas id="wheelCanvas" width="600" height="600" aria-label="轉盤"></canvas>
+            <div class="wheel-hub">轉<br />一轉</div>
+          </div>
+          <div class="wheel-result" id="wheelResult">撳「開始轉」試下手氣</div>
+          <div class="center"><button id="spinWheel">開始轉</button></div>
+          <label class="flabel" for="wheelOpts">自己改選項（一行一個，2–12 個）</label>
+          <textarea id="wheelOpts" rows="4"></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button class="ghost small" id="applyWheel">用呢組選項</button>
+          </div>
+        </section>
+
+        <!-- 鬧鐘 / 倒計時 -->
+        <section class="card" id="timer">
+          <h2><span class="ic terra"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2.5h6M5 5L3 3m18 2 2-2"/></svg></span>鬧鐘 · 倒計時</h2>
+          <p class="sub">校好時間，到點彈窗加響鈴，可以貪瞓 5 分鐘。我淨係負責叫醒你——起唔起身，係你嘅事。</p>
+          <div class="row">
+            <input type="time" id="alarmTime" class="grow" aria-label="鬧鐘時間" />
+            <input type="text" id="alarmLabel" class="grow" placeholder="標籤，例如：起身、食藥" aria-label="鬧鐘標籤" />
+            <button id="addAlarm">加鬧鐘</button>
+          </div>
+          <div id="alarmList"></div>
+          <p class="alarm-empty" id="alarmEmpty">未有鬧鐘，加返個啦。</p>
+          <div class="note">提你一句：張卡要<strong>開住</strong>先會準時響——閂咗頁面，或者部手機鎖屏擺得太耐，系統可能會凍住個計時。真係要靠佢叫起身，記得開埋手機本身個鬧鐘兜底。</div>
+
+          <label class="flabel" for="ringtoneFile">鈴聲 · 用自己揀嘅聲叫醒自己</label>
+          <p style="margin:0 0 8px; color:var(--ink-soft); font-size:0.9rem;">預設嗶嗶聲太單調，可以入返首 MP3 做鈴聲。鬧鐘同倒計時到點，都會用佢嚟響。個檔案只會留喺今次開住嘅頁面，閂咗頁面就要入過。</p>
+          <input type="file" id="ringtoneFile" accept="audio/*,.mp3" aria-label="入 MP3 鈴聲" />
+          <p id="ringtoneStatus" style="margin:8px 0 0; font-size:0.9rem; color:var(--ink-soft);">而家用緊：預設嗶嗶聲</p>
+          <div class="row" style="margin-top:8px;">
+            <button class="ghost small" id="testRingtone" type="button">試聽鈴聲</button>
+            <button class="ghost small" id="clearRingtone" type="button">用返預設聲</button>
+          </div>
+          <audio id="ringtoneAudio" preload="auto" style="display:none;"></audio>
+
+          <hr class="divider" />
+          <h2 style="font-size:1.12rem;"><span class="ic gold"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 2h12M6 22h12M8 2v4l4 4 4-4V2M8 22v-4l4-4 4 4v4"/></svg></span>倒計時</h2>
+          <div class="timer-face">
+            <div class="clock" id="timerClock">00:00</div>
+            <div class="tstate" id="timerState">揀個時長，或者自己入分鐘數</div>
+          </div>
+          <div class="presets-min">
+            <button data-min="1">1 分鐘</button>
+            <button data-min="5">5 分鐘</button>
+            <button data-min="10">10 分鐘</button>
+            <button data-min="25">25 分鐘</button>
+            <button data-min="45">45 分鐘</button>
+          </div>
+          <div class="row" style="justify-content:center;">
+            <input type="number" id="customMin" min="1" max="999" placeholder="自訂分鐘" style="width:110px; flex:none;" aria-label="自訂分鐘" />
+            <button id="startTimer">開始</button>
+            <button class="ghost" id="pauseTimer" disabled>暫停</button>
+            <button class="ghost" id="resetTimer" disabled>重設</button>
+          </div>
+        </section>
+
+        <!-- 呼吸 -->
+        <section class="card" id="breath">
+          <h2><span class="ic sage"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></span>唞下氣</h2>
+          <p class="sub">放空個腦，其他嘢暫時唔好諗。跟住個圈：吸氣 4 秒，停一停，再慢慢呼出嚟。節奏啱咗，心就定，冇咁複雜。</p>
+          <div class="breath-stage">
+            <div class="breath-circle" id="breathCircle">準備好未？</div>
+          </div>
+          <div class="breath-count" id="breathCount">一組大約一分鐘，隨時可以停</div>
+          <div class="center" style="margin-top:10px;">
+            <button id="toggleBreath">開始呼吸</button>
+          </div>
+        </section>
+
+        <!-- 經期 -->
+        <section class="card span2" id="period">
+          <h2><span class="ic rose"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4M8 15h3"/></svg></span>經期記錄</h2>
+          <p class="sub">嚟咗就記低。記得多，估得準。下次幾時嚟，我會提早三日喺張卡頂頭提你——唔使你自己數日子，數日子呢啲粗重功夫，我嚟。</p>
+          <div class="form-grid">
+            <div>
+              <label class="flabel" for="periodDate">今次嚟嘅第一日</label>
+              <input type="date" id="periodDate" />
+            </div>
+            <div>
+              <label class="flabel" for="periodFlow">流量（唔想揀可以留空）</label>
+              <select id="periodFlow">
+                <option value="">唔記低</option>
+                <option value="少">少</option>
+                <option value="中">中</option>
+                <option value="多">多</option>
+              </select>
+            </div>
+            <div>
+              <label class="flabel" for="periodCycle">你平時周期幾多日（唔知就留空，我用你嘅記錄嚟估）</label>
+              <input type="number" id="periodCycle" min="15" max="60" placeholder="例如 28" />
+            </div>
+            <div>
+              <label class="flabel" for="periodNote">備註（邊度唔舒服，寫低佢）</label>
+              <input type="text" id="periodNote" placeholder="例如：第一日肚痛、好攰" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:14px;">
+            <button id="addPeriod">記低今次</button>
+            <button class="ghost" id="periodRemindToggle" type="button">頂部提醒：開住</button>
+          </div>
+          <p class="hint">頂部提醒開住嗰陣，預計日子前三日，張卡一開就會喺最頂提你。</p>
+          <div class="predict-box" id="predictBox">
+            <p class="pb-big" id="predictText">未有記錄。記低第一次嚟嘅日子，我先有得估。</p>
+            <p class="pb-small" id="predictSub">估唔準嗰陣唔使驚，身體唔係機器，遲幾日早幾日都常見。真係唔舒服，就去睇醫生，唔好死頂。</p>
+          </div>
+          <div id="periodList"></div>
+          <p class="alarm-empty" id="periodEmpty">未有任何記錄。</p>
+          <p class="hint">啲記錄會存喺呢部手機嘅瀏覽器，閂咗重開仲喺，唔使次次入過。只存喺你自己部機，冇上傳去邊度。</p>
+        </section>
+
+        <!-- 記賬 -->
+        <section class="card span2" id="money">
+          <h2><span class="ic gold"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/><path d="M3 7v10a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></span>記賬</h2>
+          <p class="sub">使咗幾多、入咗幾多，寫低佢。錢呢家嘢，唔記就唔知去咗邊。分賬本、分貨幣，唔同用途唔好撈埋一齊數。</p>
+
+          <div class="ledger-tabs" id="ledgerTabs" role="group" aria-label="揀賬本"></div>
+          <div class="row">
+            <input type="text" id="newLedgerName" class="grow" placeholder="新賬本名，例如：旅行、屋企、人情" aria-label="新賬本名" />
+            <select id="newLedgerCur" style="width:130px; flex:none;" aria-label="新賬本貨幣"></select>
+            <button class="ghost" id="addLedger" type="button">加賬本</button>
+          </div>
+
+          <div class="sum-row">
+            <div class="sum-box"><div class="sl">呢本賬入咗</div><div class="sv in" id="sumIn">—</div></div>
+            <div class="sum-box"><div class="sl">呢本賬使咗</div><div class="sv out" id="sumOut">—</div></div>
+            <div class="sum-box"><div class="sl">淨返（按貨幣分開計）</div><div class="sv" id="sumNet">—</div></div>
+          </div>
+
+          <h3 class="subhead">記一筆</h3>
+          <div class="center" style="margin-bottom:4px;">
+            <div class="seg" id="txType" role="group" aria-label="支出定收入">
+              <button data-t="out" class="on">支出</button>
+              <button data-t="in">收入</button>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label class="flabel" for="txAmount">金額</label>
+              <input type="number" id="txAmount" min="0" step="0.01" placeholder="例如 68" />
+            </div>
+            <div>
+              <label class="flabel" for="txCurrency">貨幣</label>
+              <select id="txCurrency"></select>
+            </div>
+            <div>
+              <label class="flabel" for="txCategory">類別</label>
+              <select id="txCategory"></select>
+            </div>
+            <div>
+              <label class="flabel" for="txDate">日期</label>
+              <input type="date" id="txDate" />
+            </div>
+          </div>
+          <label class="flabel" for="txNote">備註</label>
+          <input type="text" id="txNote" placeholder="例如：同阿媽飲茶、買飛" />
+          <div class="row" style="margin-top:14px;">
+            <button id="addTx">記低呢筆</button>
+          </div>
+          <div id="txList"></div>
+          <p class="alarm-empty" id="txEmpty">呢本賬未有記錄。使錢嗰陣，順手記低，唔難。</p>
+
+          <hr class="divider" />
+          <h3 class="subhead">存款目標</h3>
+          <p class="sub" style="margin-bottom:6px;">想儲錢買咩、去邊，自己開個目標。存入、攞出，都記得清清楚楚。儲到幾多，我幫你睇住——唔准偷偷攞嚟使，攞咗我會知。</p>
+          <div class="presets" id="goalPresets" role="group" aria-label="目標快揀">
+            <button type="button" data-g="去旅行">去旅行</button>
+            <button type="button" data-g="睇演唱會">睇演唱會</button>
+            <button type="button" data-g="應急錢">應急錢</button>
+            <button type="button" data-g="買畀自己嘅禮物">買畀自己嘅禮物</button>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label class="flabel" for="goalName">目標名（自己改都得）</label>
+              <input type="text" id="goalName" placeholder="例如：去日本、換電話" />
+            </div>
+            <div>
+              <label class="flabel" for="goalTarget">想儲到幾多</label>
+              <input type="number" id="goalTarget" min="0" step="0.01" placeholder="例如 8000" />
+            </div>
+            <div>
+              <label class="flabel" for="goalCurrency">貨幣</label>
+              <select id="goalCurrency"></select>
+            </div>
+            <div>
+              <label class="flabel" for="goalStart">一開始已經儲咗幾多（冇就留空）</label>
+              <input type="number" id="goalStart" min="0" step="0.01" placeholder="0" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:14px;">
+            <button id="addGoal">開呢個目標</button>
+          </div>
+          <div id="goalList"></div>
+          <p class="alarm-empty" id="goalEmpty">未有存款目標。開一個，慢慢儲，唔使急。</p>
+          <p class="hint">記賬同存款記錄一樣，會存喺呢部手機嘅瀏覽器，閂咗重開仲喺。</p>
+        </section>
+
+        <!-- 備份同搬家 -->
+        <section class="card span2" id="backup">
+          <h2><span class="ic sage"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>備份同搬家</h2>
+          <p class="sub">搬屋要執嘢，搬卡一樣。換網址、換賬號、換手機之前，先喺舊嗰邊撳「導出備份」，將記錄收成一個檔案存去部機；去到新嗰邊，撳「導入」，揀返個檔案，經期、賬本、收支、存款目標，一筆都唔會少。唔好懶——冇備份就搬，唔見咗唔好喊。</p>
+          <div class="row">
+            <button id="exportBackup" type="button">導出備份</button>
+          </div>
+          <label class="flabel" for="importFile">導入備份（揀返之前導出嗰個檔案）</label>
+          <input type="file" id="importFile" accept=".json,application/json" aria-label="揀備份檔案導入" />
+          <div class="note" id="importConfirm" style="display:none;">
+            <p style="margin:0 0 6px;" id="importSummary"></p>
+            <p style="margin:0;">講清楚先：導入會將而家張卡嘅記錄<strong>全部蓋過</strong>，換成備份入面嗰啲，冇得返轉頭。肯定先撳確認。</p>
+            <div class="row" style="margin-top:10px;">
+              <button id="confirmImport" type="button">確認導入，蓋過佢</button>
+              <button class="ghost" id="cancelImport" type="button">算數，唔導住</button>
+            </div>
+          </div>
+          <p class="hint" id="backupStatus" role="status"></p>
+          <p class="hint">個備份檔案入面得你自己啲記錄，收好佢，唔好周圍傳。</p>
+        </section>
+      </div>
+
+      <footer>就係咁多。該瞓就瞓，該做嘢就做嘢。下次見。</footer>
+    </div>
+
+    <!-- 鬧鐘彈窗 -->
+    <div class="overlay" id="alarmOverlay" role="alertdialog" aria-label="鬧鐘提醒">
+      <div class="box">
+        <div class="big" id="overlayTime">07:00</div>
+        <div class="lab" id="overlayLabel">時間到喇</div>
+        <div class="row" style="justify-content:center;">
+          <button class="ghost" id="snoozeBtn">貪瞓 5 分鐘</button>
+          <button id="dismissBtn">好，起身</button>
+        </div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+      (function () {
+        "use strict";
+        var $ = function (id) { return document.getElementById(id); };
+
+        /* 本頁唔載入任何網絡字體，全程只用系統字體（見頁首註解）。 */
+
+        /* ---------- 小工具 ---------- */
+        function pad2(n) { return String(n).padStart(2, "0"); }
+        function dateStr(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+        function parseDateStr(s) {
+          var p = String(s || "").split("-");
+          if (p.length !== 3) return null;
+          var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+          return isNaN(d.getTime()) ? null : d;
+        }
+        function dayDiff(a, b) { // b - a，計日數（唔計時分秒）
+          var ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+          var ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+          return Math.round((ub - ua) / 86400000);
+        }
+        function fmtDateCN(d) { return (d.getMonth() + 1) + " 月 " + d.getDate() + " 日"; }
+        function esc(s) {
+          return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+          });
+        }
+
+        /* ---------- toast ---------- */
+        var toastTimer = null;
+        function toast(msg) {
+          var t = $("toast");
+          t.textContent = msg;
+          t.classList.add("show");
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
+        }
+
+        /* ---------- 本地存檔：經期、賬本、收支、存款目標 ----------
+           存喺呢部機嘅瀏覽器 localStorage，唔上傳去邊度。
+           讀寫全部包住 try/catch：部機唔畀存嗰陣，只顯示一行提示，
+           唔會阻塞或者卡住頁面打開。鬧鐘同 MP3 鈴聲唔入存檔，維持原本做法。 */
+        var STORE_KEY = "davidCompanionCard.v1";
+        var storageOk = true;
+        function showStorageWarn() { var w = $("storageWarn"); if (w) w.style.display = "block"; }
+        function storageLoad() {
+          try {
+            var probe = STORE_KEY + ".probe";
+            window.localStorage.setItem(probe, "1");
+            window.localStorage.removeItem(probe);
+          } catch (e) { storageOk = false; }
+          try {
+            var raw = window.localStorage.getItem(STORE_KEY);
+            if (!raw) return null;
+            var data = JSON.parse(raw);
+            return (data && typeof data === "object") ? data : null;
+          } catch (e) { storageOk = false; return null; }
+        }
+        var savedData = storageLoad();
+        if (!storageOk) showStorageWarn();
+        function storageSave() {
+          try {
+            window.localStorage.setItem(STORE_KEY, JSON.stringify({
+              periodEntries: periodEntries, periodSeq: periodSeq,
+              periodRemindOn: periodRemindOn, periodCycle: $("periodCycle").value,
+              ledgers: ledgers, ledgerSeq: ledgerSeq, txSeq: txSeq, activeLedgerId: activeLedgerId,
+              goals: goals, goalSeq: goalSeq
+            }));
+          } catch (e) { storageOk = false; showStorageWarn(); }
+        }
+
+        /* ---------- 日期 / 問候 / 每日一句 ---------- */
+        var now = new Date();
+        var weekNames = ["日", "一", "二", "三", "四", "五", "六"];
+        $("todayDate").textContent = now.getFullYear() + " 年 " + (now.getMonth() + 1) + " 月 " + now.getDate() + " 日 · 星期" + weekNames[now.getDay()];
+        var h = now.getHours();
+        $("greeting").textContent =
+          h < 6 ? "呢個鐘數仲未瞓。膽夠大。去瞓，而家——冇得商量" :
+          h < 12 ? "早。食咗早餐先。空肚嗰陣，咩都唔好傾" :
+          h < 14 ? "晏晝好。食咗飯未？未食就食咗先，其他嘢排後" :
+          h < 18 ? "下晝好。攰就停一停。死頂唔值錢，冇人會頒獎畀你" :
+          h < 23 ? "夜晚好。今日嘅事去到呢度。剩低嗰啲，聽日先算" : "夜深喇。仲磨蹭乜——瞓。";
+
+        var dailyLines = [
+          "數嚟數去計唔掂，就放低佢先。數唔會走，人會冧。分清楚邊樣緊要。",
+          "輸咗，認。喊解決唔到問題，但亦唔失禮。抹乾淨，再嚟過。",
+          "食咗飯先。餓住個肚做嘅決定，十個有九個都係錯嘅。",
+          "天冧唔落嚟。真係冧，都唔使你一個人頂晒。",
+          "今日做唔到，係今日嘅事。唔好用一日嚟否定自己，唔抵。",
+          "討好晒所有人，係最蝕底嘅買賣。收手。睇唔順眼嘅，行開就係。",
+          "攰就瞓，餓就食。簡單嘅事，唔好諗到咁複雜。",
+          "喊完，啲問題仲喺度。咁就逐個解決。次序，我幫你排。",
+          "行得慢，唔等於行錯。唔好成日望返轉頭，條路喺前面。",
+          "唔好睇小自己。喺我呢度，你嘅價錢唔係人哋定嘅。",
+          "情緒係起伏，唔係結論。坐定，等佢過。",
+          "今晚早啲瞓。捱夜解決唔到任何事，仲會累埋聽日。",
+          "唔開心唔使理由，更加唔使邊個批准。認咗佢，反而輕鬆。",
+          "贏一局就夠。今日贏一局先——細嘅都計。"
+        ];
+        var dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+        $("dailyLine").textContent = dailyLines[dayOfYear % dailyLines.length];
+
+        /* ---------- 安慰說話 ---------- */
+        var comfort = {
+          tired: { label: "好攰", lines: [
+            "攰就瞓。呢句唔係商量，係通知。天大嘅事聽日先講——今晚邊個都唔准搞你。",
+            "你唔係機器。機器熱得滯都要停機，何況人。停，而家。",
+            "食啲熱嘢先，飲啖水。空住個肚死頂，係最蠢嗰種堅持。",
+            "今日去到呢度。剩低嗰啲，唔歸你今晚管。",
+            "唔好學我用咖啡頂命。嗰啲唔係本事，係透支。你唔准。",
+            "做到呢度，夠喇。剩低嘅交畀人哋，交畀聽日，都得。去瞓低。",
+            "頂唔順仲要頂，畀邊個睇？冇人睇。去瞓，唔好嘥力扮堅強。",
+            "瞇埋眼。你瞓少一晚先係真蝕底，個世界停一晚唔會冧。"
+          ]},
+          sad: { label: "好委屈", lines: [
+            "坐低先。慢慢講，我唔趕時間。喊都得，唔失禮——失禮嗰個係令你喊嘅人。",
+            "眼淚值唔值錢，睇對住邊個。喺我呢度，你唔使忍。忍，係留畀外人嘅。",
+            "唔係你錯。有啲人眼光差，睇唔到你嘅好。唔好用人哋嘅差嚟罰自己。",
+            "唔好講冇事。你塊面寫住有事。講，我聽住——聽完，對錯我嚟分。",
+            "邊個畀委屈你，記低個名。呢啲數，唔使你自己去追，會有人追。",
+            "你嘅感受唔使邊個批准。你話痛，就係痛。呢件事，冇得拗。",
+            "人哋嘅刻薄，唔好攞嚟着上身。着錯咗就除返落嚟，掟返過去，嗰件唔係你嘅。",
+            "抹乾淨，擡起頭。氣勢攞返嚟先，剩低啲數，再慢慢計。"
+          ]},
+          stuck: { label: "冇晒動力", lines: [
+            "冇動力？正常。畀你頹五分鐘。頹完，做最細嗰一步——多一分都唔使。",
+            "一啖食唔成隻象。將件事切細，細到而家就郁得手。郁手，唔好淨係諗。",
+            "低位唔係終點，係未彈返上去。唔好喺最低嗰陣，將自己平賣。",
+            "卡住就換個打法。洗把面，飲杯水，返嚟再睇——多數冇你諗到咁難。",
+            "做五分鐘就好。五分鐘之後都係唔想做，停，我批准。我嘅批准好難攞，珍惜下。",
+            "同自己死磕冇用。方法多的是，一個唔得換下一個，換到得為止。",
+            "今日做一件事就夠。做完，今日就唔算白過。要求唔高，做啦。",
+            "個腦亂，先執好張枱。手邊有秩序，個腦先靜得到。呢招我用咗好多年，唔外傳。"
+          ]},
+          down: { label: "就係唔開心", lines: [
+            "唔開心咪唔開心。唔使理由，唔使解釋，更加唔使笑畀人睇。",
+            "去食餐好嘅先。個胃有熱氣，心入面嗰啲凍，壓得住。呢句係經驗，唔係安慰。",
+            "陰天啫。坐住等，雨唔會落一世。我陪你等——但唔准淋親自己。",
+            "頹陣間得。時間到，自己起返身。起唔到，我拉你，唔使你開口。",
+            "唔好自己一個匿埋。要匿，嚟我呢度。個角落留畀你，冇人嘈你，我保證。",
+            "帶住咁嘅心情都過到今日，唔叫脆弱，叫捱得。邊個話你脆弱，叫佢收聲。",
+            "低落會過，同天氣一樣。你要做嘅得一件事：留喺屋入面，唔好淋雨。",
+            "今日就係咁。唔好，亦唔算最衰。聽日再睇，天唔會冧。"
+          ]}
+        };
+        var currentMood = "down";
+        var lastIdx = -1;
+        var moodBtns = $("moodBtns");
+        Object.keys(comfort).forEach(function (key) {
+          var b = document.createElement("button");
+          b.textContent = comfort[key].label;
+          b.dataset.mood = key;
+          if (key === currentMood) b.classList.add("on");
+          b.addEventListener("click", function () {
+            currentMood = key; lastIdx = -1;
+            moodBtns.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x.dataset.mood === key); });
+            drawComfort();
+          });
+          moodBtns.appendChild(b);
+        });
+        function drawComfort() {
+          var lines = comfort[currentMood].lines;
+          var i;
+          do { i = Math.floor(Math.random() * lines.length); } while (lines.length > 1 && i === lastIdx);
+          lastIdx = i;
+          showComfortLine(lines[i]);
+        }
+        function showComfortLine(text) {
+          var el = $("comfortText");
+          el.textContent = text;
+          el.classList.remove("fadein");
+          void el.offsetWidth;
+          el.classList.add("fadein");
+        }
+        function setMood(key) {
+          currentMood = key; lastIdx = -1;
+          moodBtns.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x.dataset.mood === key); });
+        }
+        $("drawComfort").addEventListener("click", drawComfort);
+        $("copyComfort").addEventListener("click", function () {
+          var text = $("comfortText").textContent;
+          function done() { toast("複製好喇。收埋又得，send 畀人又得，你話事"); }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, function () { toast("複製唔到，長撳文字都可以複製"); });
+          } else { toast("長撳文字都可以複製"); }
+        });
+
+        /* ---------- 骰仔 ---------- */
+        var pips = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+        var diceCountVal = 1;
+        function makeDie() {
+          var d = document.createElement("div");
+          d.className = "die";
+          for (var i = 0; i < 9; i++) d.appendChild(document.createElement("i"));
+          return d;
+        }
+        function setDie(d, v) {
+          var cells = d.children;
+          for (var i = 0; i < 9; i++) cells[i].classList.toggle("show", pips[v].indexOf(i) >= 0);
+        }
+        function renderDice() {
+          var row = $("diceRow");
+          row.innerHTML = "";
+          for (var i = 0; i < diceCountVal; i++) { var d = makeDie(); setDie(d, i + 1 > 6 ? 6 : i + 1); row.appendChild(d); }
+        }
+        renderDice();
+        $("diceCount").querySelectorAll("button").forEach(function (b) {
+          b.addEventListener("click", function () {
+            diceCountVal = parseInt(b.dataset.n, 10);
+            $("diceCount").querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+            renderDice();
+            $("diceTotal").textContent = "撳「掟骰仔」開始";
+          });
+        });
+        var rolling = false;
+        $("rollDice").addEventListener("click", function () {
+          if (rolling) return;
+          rolling = true;
+          var dice = $("diceRow").children;
+          for (var i = 0; i < dice.length; i++) dice[i].classList.add("rolling");
+          $("diceTotal").textContent = "掟緊……";
+          var ticks = 0;
+          var iv = setInterval(function () {
+            ticks++;
+            for (var j = 0; j < dice.length; j++) setDie(dice[j], 1 + Math.floor(Math.random() * 6));
+            if (ticks >= 7) {
+              clearInterval(iv);
+              var total = 0, vals = [];
+              for (var k = 0; k < dice.length; k++) {
+                var v = 1 + Math.floor(Math.random() * 6);
+                setDie(dice[k], v); dice[k].classList.remove("rolling");
+                vals.push(v); total += v;
+              }
+              $("diceTotal").innerHTML = diceCountVal > 1
+                ? "掟到 " + vals.join(" + ") + "，合共 <b>" + total + "</b> 點"
+                : "掟到 <b>" + total + "</b> 點";
+              rolling = false;
+            }
+          }, 80);
+        });
+
+        /* ---------- 決定骰 ---------- */
+        var deciding = false;
+        $("rollDecision").addEventListener("click", function () {
+          if (deciding) return;
+          var opts = $("decisionOpts").value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+          if (opts.length < 2) { toast("至少要有兩個選項吖"); return; }
+          deciding = true;
+          var out = $("decisionResult");
+          var ticks = 0;
+          var iv = setInterval(function () {
+            ticks++;
+            out.textContent = opts[Math.floor(Math.random() * opts.length)];
+            if (ticks >= 10) {
+              clearInterval(iv);
+              out.textContent = "就佢：「" + opts[Math.floor(Math.random() * opts.length)] + "」。定咗。第二個選項，唔使再諗。";
+              deciding = false;
+            }
+          }, 70);
+        });
+
+        /* ---------- 大轉盤 ---------- */
+        var wheelPresets = {
+          food: { label: "食咩好", opts: ["拉麵", "壽司", "火鍋", "燒味飯", "茶餐廳", "意粉", "沙律", "粥麵"] },
+          todo: { label: "今日做咩好", opts: ["去散步", "聽歌", "睇書", "畫畫", "沖杯熱飲", "發呆放空", "做下拉伸", "寫手帳"] },
+          relax: { label: "放鬆下", opts: ["深呼吸", "飲杯水", "望下遠處", "聽首歌", "伸個懶腰", "洗把面", "行一陣", "瞇埋眼唞下"] }
+        };
+        var wheelColors = ["#e8a37c", "#a9c79b", "#ecc97e", "#e89a87", "#9db8a4", "#dcb28a", "#d98e73", "#b5c99a", "#e5b8a2", "#a3b18a", "#e9c46a", "#dda08a"];
+        var wheelOpts = wheelPresets.food.opts.slice();
+        var angle = 0, spinning = false;
+        var presetsEl = $("wheelPresets");
+        Object.keys(wheelPresets).forEach(function (key, idx) {
+          var b = document.createElement("button");
+          b.textContent = wheelPresets[key].label;
+          if (idx === 0) b.classList.add("on");
+          b.addEventListener("click", function () {
+            wheelOpts = wheelPresets[key].opts.slice();
+            $("wheelOpts").value = wheelOpts.join("\n");
+            presetsEl.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+            $("wheelResult").textContent = "撳「開始轉」試下手氣";
+            drawWheel();
+          });
+          presetsEl.appendChild(b);
+        });
+        $("wheelOpts").value = wheelOpts.join("\n");
+        function drawWheel() {
+          var cv = $("wheelCanvas"), ctx = cv.getContext("2d");
+          if (!ctx) return;
+          var W = cv.width, C = W / 2, R = C - 8;
+          ctx.clearRect(0, 0, W, W);
+          var n = wheelOpts.length;
+          var seg = (Math.PI * 2) / n;
+          for (var i = 0; i < n; i++) {
+            var a0 = angle + i * seg, a1 = a0 + seg;
+            ctx.beginPath();
+            ctx.moveTo(C, C);
+            ctx.arc(C, C, R, a0, a1);
+            ctx.closePath();
+            ctx.fillStyle = wheelColors[i % wheelColors.length];
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255,255,255,0.65)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.save();
+            ctx.translate(C, C);
+            ctx.rotate(a0 + seg / 2);
+            ctx.textAlign = "right";
+            ctx.fillStyle = "#3b2a1e";
+            ctx.font = "600 " + Math.max(20, Math.min(30, 240 / n)) + "px 'Noto Sans TC', sans-serif";
+            var label = wheelOpts[i];
+            if (label.length > 6) label = label.slice(0, 6);
+            ctx.fillText(label, R - 18, 10);
+            ctx.restore();
+          }
+          ctx.beginPath();
+          ctx.arc(C, C, R, 0, Math.PI * 2);
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = "rgba(120,72,40,0.35)";
+          ctx.stroke();
+        }
+        drawWheel();
+        $("applyWheel").addEventListener("click", function () {
+          var opts = $("wheelOpts").value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+          if (opts.length < 2) { toast("至少要有兩個選項吖"); return; }
+          if (opts.length > 12) { toast("最多放 12 個選項吖"); opts = opts.slice(0, 12); }
+          wheelOpts = opts;
+          presetsEl.querySelectorAll("button").forEach(function (x) { x.classList.remove("on"); });
+          $("wheelResult").textContent = "撳「開始轉」試下手氣";
+          drawWheel();
+          toast("轉盤換好喇");
+        });
+        $("spinWheel").addEventListener("click", function () {
+          if (spinning) return;
+          spinning = true;
+          $("spinWheel").disabled = true;
+          $("wheelResult").textContent = "轉緊……";
+          var n = wheelOpts.length, seg = (Math.PI * 2) / n;
+          var targetIdx = Math.floor(Math.random() * n);
+          var targetCenter = -Math.PI / 2 - (targetIdx + 0.5) * seg;
+          var current = angle % (Math.PI * 2);
+          var delta = (targetCenter - current) % (Math.PI * 2);
+          if (delta < 0) delta += Math.PI * 2;
+          var total = Math.PI * 2 * 5 + delta;
+          var start = angle, t0 = null, dur = 3800;
+          function frame(ts) {
+            if (!t0) t0 = ts;
+            var p = Math.min(1, (ts - t0) / dur);
+            var ease = 1 - Math.pow(1 - p, 4);
+            angle = start + total * ease;
+            drawWheel();
+            if (p < 1) { requestAnimationFrame(frame); }
+            else {
+              angle = start + total;
+              spinning = false;
+              $("spinWheel").disabled = false;
+              var el = $("wheelResult");
+              el.textContent = "結果：「" + wheelOpts[targetIdx] + "」。照做。轉盤唔同你商量，我都唔會。";
+              el.classList.remove("fadein"); void el.offsetWidth; el.classList.add("fadein");
+            }
+          }
+          requestAnimationFrame(frame);
+        });
+
+        /* ---------- 聲音（WebAudio 嗶嗶聲） ---------- */
+        var audioCtx = null;
+        function beep(times) {
+          try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === "suspended") audioCtx.resume();
+            for (var i = 0; i < times; i++) {
+              var t = audioCtx.currentTime + i * 0.45;
+              var osc = audioCtx.createOscillator();
+              var gain = audioCtx.createGain();
+              osc.type = "sine"; osc.frequency.value = 880;
+              gain.gain.setValueAtTime(0.0001, t);
+              gain.gain.exponentialRampToValueAtTime(0.25, t + 0.03);
+              gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+              osc.connect(gain); gain.connect(audioCtx.destination);
+              osc.start(t); osc.stop(t + 0.4);
+            }
+          } catch (e) { /* 無聲環境下靜默 */ }
+        }
+
+        /* ---------- 自訂鈴聲（MP3 入嚟，只留喺今次頁面） ---------- */
+        var ringtoneUrl = null;
+        var ringtoneName = "";
+        var ringtoneAudio = $("ringtoneAudio");
+        var ringtonePreviewing = false;
+        function stopRingtone() {
+          ringtonePreviewing = false;
+          $("testRingtone").textContent = "試聽鈴聲";
+          try { ringtoneAudio.pause(); ringtoneAudio.currentTime = 0; } catch (e) {}
+        }
+        function playRingtoneSound() {
+          if (ringtoneUrl) {
+            try {
+              ringtoneAudio.src = ringtoneUrl;
+              ringtoneAudio.loop = true;
+              var p = ringtoneAudio.play();
+              if (p && p.catch) p.catch(function () { beep(4); });
+              return;
+            } catch (e) { /* 落返去預設聲 */ }
+          }
+          beep(4);
+        }
+        $("ringtoneFile").addEventListener("change", function () {
+          var f = this.files && this.files[0];
+          if (!f) return;
+          stopRingtone();
+          if (ringtoneUrl) { try { URL.revokeObjectURL(ringtoneUrl); } catch (e) {} ringtoneUrl = null; }
+          ringtoneUrl = URL.createObjectURL(f);
+          ringtoneName = f.name || "自訂鈴聲.mp3";
+          $("ringtoneStatus").textContent = "而家用緊：「" + ringtoneName + "」（鬧鐘／倒計時到點會播佢）";
+          toast("鈴聲換好喇：" + ringtoneName);
+        });
+        $("testRingtone").addEventListener("click", function () {
+          if (ringtonePreviewing) { stopRingtone(); return; }
+          if (!ringtoneUrl) { beep(2); toast("呢個係預設嗶嗶聲——入返首 MP3 試下吖"); return; }
+          try {
+            ringtoneAudio.src = ringtoneUrl;
+            ringtoneAudio.loop = false;
+            var p = ringtoneAudio.play();
+            if (p && p.catch) p.catch(function () { toast("呢首播唔到，換過首 MP3 試下"); });
+            ringtonePreviewing = true;
+            this.textContent = "停試聽";
+          } catch (e) { toast("呢首播唔到，換過首 MP3 試下"); }
+        });
+        ringtoneAudio.addEventListener("ended", function () { stopRingtone(); });
+        $("clearRingtone").addEventListener("click", function () {
+          stopRingtone();
+          if (ringtoneUrl) { try { URL.revokeObjectURL(ringtoneUrl); } catch (e) {} }
+          ringtoneUrl = null; ringtoneName = "";
+          $("ringtoneFile").value = "";
+          ringtoneAudio.removeAttribute("src");
+          $("ringtoneStatus").textContent = "而家用緊：預設嗶嗶聲";
+          toast("用返預設嗶嗶聲喇");
+        });
+
+        /* ---------- 鬧鐘 ---------- */
+        var alarms = []; // {id, time:"HH:MM", label, firedKey}
+        var alarmSeq = 0;
+        var ringingAlarm = null;
+        function renderAlarms() {
+          var list = $("alarmList");
+          list.innerHTML = "";
+          $("alarmEmpty").style.display = alarms.length ? "none" : "block";
+          alarms.slice().sort(function (a, b) { return a.time < b.time ? -1 : 1; }).forEach(function (al) {
+            var div = document.createElement("div");
+            div.className = "alarm-item";
+            var t = document.createElement("span"); t.className = "time"; t.textContent = al.time;
+            var l = document.createElement("span"); l.className = "lab"; l.textContent = al.label || "鬧鐘";
+            var del = document.createElement("button"); del.className = "del"; del.textContent = "刪咗佢";
+            del.addEventListener("click", function () {
+              alarms = alarms.filter(function (x) { return x.id !== al.id; });
+              renderAlarms(); toast("鬧鐘刪咗喇");
+            });
+            div.appendChild(t); div.appendChild(l); div.appendChild(del);
+            list.appendChild(div);
+          });
+        }
+        $("addAlarm").addEventListener("click", function () {
+          var time = $("alarmTime").value;
+          if (!time) { toast("揀個時間先吖"); return; }
+          alarms.push({ id: ++alarmSeq, time: time, label: $("alarmLabel").value.trim(), firedKey: "" });
+          $("alarmLabel").value = "";
+          renderAlarms();
+          toast("鬧鐘校好喇：" + time + "。張卡開住，到點會響");
+          beep(1); // 順手喚醒音訊，之後到點先出到聲
+        });
+        function ring(al, displayTime, displayLabel) {
+          ringingAlarm = { alarm: al, snoozes: 0 };
+          $("overlayTime").textContent = displayTime;
+          $("overlayLabel").textContent = displayLabel || "時間到喇";
+          $("alarmOverlay").classList.add("show");
+          playRingtoneSound();
+        }
+        $("dismissBtn").addEventListener("click", function () {
+          stopRingtone();
+          $("alarmOverlay").classList.remove("show");
+          ringingAlarm = null;
+        });
+        $("snoozeBtn").addEventListener("click", function () {
+          stopRingtone();
+          if (!ringingAlarm) return;
+          var d = new Date(Date.now() + 5 * 60000);
+          var hh = pad2(d.getHours()), mm = pad2(d.getMinutes());
+          if (ringingAlarm.alarm) {
+            ringingAlarm.alarm.time = hh + ":" + mm;
+            ringingAlarm.alarm.firedKey = "";
+          }
+          ringingAlarm = null;
+          $("alarmOverlay").classList.remove("show");
+          renderAlarms();
+          toast("好，5 分鐘後再叫你");
+        });
+        setInterval(function () {
+          var d = new Date();
+          var key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate() + " " + d.getHours() + ":" + d.getMinutes();
+          var nowHM = pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+          alarms.forEach(function (al) {
+            if (al.time === nowHM && al.firedKey !== key) {
+              al.firedKey = key;
+              ring(al, al.time, al.label ? al.label : "鬧鐘響喇");
+            }
+          });
+        }, 1000);
+
+        /* ---------- 倒計時 ---------- */
+        var timerTotal = 0, timerLeft = 0, timerIv = null, timerRunning = false;
+        function fmt(sec) {
+          var m = Math.floor(sec / 60), s = sec % 60;
+          return pad2(m) + ":" + pad2(s);
+        }
+        function showTimer() { $("timerClock").textContent = fmt(Math.max(0, timerLeft)); }
+        function stopTimerIv() { if (timerIv) { clearInterval(timerIv); timerIv = null; } timerRunning = false; $("pauseTimer").textContent = "暫停"; }
+        function startTicking() {
+          stopTimerIv();
+          timerRunning = true;
+          $("pauseTimer").disabled = false; $("resetTimer").disabled = false; $("pauseTimer").textContent = "暫停";
+          timerIv = setInterval(function () {
+            timerLeft--;
+            showTimer();
+            if (timerLeft <= 0) {
+              stopTimerIv();
+              $("timerState").textContent = "時間到。停，唞下";
+              ring(null, fmt(timerTotal), "倒計時完喇");
+            }
+          }, 1000);
+        }
+        function setTimer(min) {
+          stopTimerIv();
+          timerTotal = timerLeft = min * 60;
+          showTimer();
+          $("timerState").textContent = "準備好就撳開始";
+          $("pauseTimer").disabled = true; $("resetTimer").disabled = false;
+        }
+        document.querySelectorAll(".presets-min button").forEach(function (b) {
+          b.addEventListener("click", function () { setTimer(parseInt(b.dataset.min, 10)); });
+        });
+        $("startTimer").addEventListener("click", function () {
+          if (timerLeft <= 0) {
+            var v = parseInt($("customMin").value, 10);
+            if (!v || v < 1) { toast("揀個時長，或者入返分鐘數先吖"); return; }
+            setTimer(v);
+          }
+          if (timerRunning) return;
+          beep(1);
+          $("timerState").textContent = "計緊時……專心做呢一件事就好";
+          startTicking();
+        });
+        $("pauseTimer").addEventListener("click", function () {
+          if (timerRunning) { stopTimerIv(); $("pauseTimer").textContent = "繼續"; $("timerState").textContent = "停緊，唞下都好"; }
+          else if (timerLeft > 0) { $("timerState").textContent = "計緊時……"; startTicking(); }
+        });
+        $("resetTimer").addEventListener("click", function () {
+          stopTimerIv();
+          timerLeft = timerTotal;
+          showTimer();
+          $("timerState").textContent = timerTotal ? "重設好喇，撳開始再嚟" : "揀個時長，或者自己入分鐘數";
+          $("pauseTimer").disabled = true; $("resetTimer").disabled = timerTotal === 0;
+        });
+        showTimer();
+
+        /* ---------- 呼吸 ---------- */
+        var breathing = false, breathTimers = [];
+        function clearBreath() { breathTimers.forEach(clearTimeout); breathTimers = []; }
+        function breathCycle() {
+          if (!breathing) return;
+          var c = $("breathCircle"), count = $("breathCount");
+          c.style.transition = "transform 4s ease-in-out";
+          c.textContent = "吸氣……";
+          c.style.transform = "scale(1)";
+          count.textContent = "慢慢吸，吸滿佢";
+          breathTimers.push(setTimeout(function () {
+            if (!breathing) return;
+            c.textContent = "停一停";
+            c.style.transition = "transform 1.5s ease";
+            count.textContent = "停住，感受下";
+            breathTimers.push(setTimeout(function () {
+              if (!breathing) return;
+              c.textContent = "呼氣……";
+              c.style.transition = "transform 4s ease-in-out";
+              c.style.transform = "scale(0.72)";
+              count.textContent = "慢慢呼出嚟，啲緊繃一齊呼走";
+              breathTimers.push(setTimeout(breathCycle, 4200));
+            }, 1600));
+          }, 4100));
+        }
+        $("toggleBreath").addEventListener("click", function () {
+          var c = $("breathCircle");
+          if (!breathing) {
+            breathing = true;
+            $("toggleBreath").textContent = "停低";
+            breathCycle();
+          } else {
+            breathing = false;
+            clearBreath();
+            c.style.transition = "transform 0.6s ease";
+            c.style.transform = "scale(0.72)";
+            c.textContent = "準備好未？";
+            $("breathCount").textContent = "一組大約一分鐘，隨時可以停";
+            $("toggleBreath").textContent = "開始呼吸";
+          }
+        });
+
+        /* ---------- 經期記錄 / 預測 / 提醒 ---------- */
+        var periodEntries = []; // {id, date:"YYYY-MM-DD", flow, note}
+        var periodSeq = 0;
+        var periodRemindOn = true;
+        var bannerDismissedKey = "";
+        $("periodDate").value = dateStr(new Date());
+        function periodCalc() {
+          if (!periodEntries.length) return null;
+          var sorted = periodEntries.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+          var last = parseDateStr(sorted[sorted.length - 1].date);
+          var custom = parseInt($("periodCycle").value, 10);
+          var cycle = 0, cycleSrc = "";
+          if (sorted.length >= 2) {
+            var diffs = [];
+            for (var i = 1; i < sorted.length; i++) {
+              var dd = dayDiff(parseDateStr(sorted[i - 1].date), parseDateStr(sorted[i].date));
+              if (dd >= 15 && dd <= 60) diffs.push(dd);
+            }
+            if (diffs.length) {
+              var sum = 0; diffs.forEach(function (x) { sum += x; });
+              cycle = Math.round(sum / diffs.length);
+              cycleSrc = "按你之前 " + diffs.length + " 次記錄平均計";
+            }
+          }
+          if (!cycle && custom >= 15 && custom <= 60) { cycle = custom; cycleSrc = "按你入嘅周期日數計"; }
+          if (!cycle) { cycle = 28; cycleSrc = "暫時用 28 日嚟估，記多一兩次就會準啲"; }
+          var next = new Date(last.getTime());
+          next.setDate(next.getDate() + cycle);
+          return { last: last, cycle: cycle, cycleSrc: cycleSrc, next: next, count: sorted.length };
+        }
+        function renderPeriod() {
+          var list = $("periodList");
+          list.innerHTML = "";
+          $("periodEmpty").style.display = periodEntries.length ? "none" : "block";
+          periodEntries.slice().sort(function (a, b) { return a.date > b.date ? -1 : 1; }).forEach(function (en) {
+            var d = parseDateStr(en.date);
+            var div = document.createElement("div");
+            div.className = "record-item";
+            var rd = document.createElement("span"); rd.className = "rdate";
+            rd.textContent = d ? (d.getFullYear() + " 年 " + fmtDateCN(d)) : en.date;
+            div.appendChild(rd);
+            if (en.flow) { var tg = document.createElement("span"); tg.className = "rtag"; tg.textContent = "流量：" + en.flow; div.appendChild(tg); }
+            if (en.note) { var nt = document.createElement("span"); nt.className = "rtag"; nt.textContent = en.note; div.appendChild(nt); }
+            var del = document.createElement("button"); del.className = "del"; del.textContent = "刪咗佢";
+            del.addEventListener("click", function () {
+              periodEntries = periodEntries.filter(function (x) { return x.id !== en.id; });
+              renderPeriod(); storageSave(); toast("嗰次記錄刪咗喇");
+            });
+            div.appendChild(del);
+            list.appendChild(div);
+          });
+          var calc = periodCalc();
+          var today = new Date();
+          if (!calc) {
+            $("predictText").textContent = "未有記錄。記低第一次嚟嘅日子，我先有得估。";
+            $("predictSub").textContent = "估唔準嗰陣唔使驚，身體唔係機器，遲幾日早幾日都常見。真係唔舒服，就去睇醫生，唔好死頂。";
+          } else {
+            var until = dayDiff(today, calc.next);
+            var head;
+            if (until > 0) head = "下次預計 " + fmtDateCN(calc.next) + " 嚟，仲有 " + until + " 日。";
+            else if (until === 0) head = "預計就係今日（" + fmtDateCN(calc.next) + "）。";
+            else head = "預計日子係 " + fmtDateCN(calc.next) + "，已經過咗 " + (-until) + " 日。";
+            $("predictText").textContent = head + "上次係 " + fmtDateCN(calc.last) + " 嚟，周期大約 " + calc.cycle + " 日（" + calc.cycleSrc + "）。";
+            $("predictSub").textContent = until <= 3 && until >= 0
+              ? "就快到。熱水、暖貼、止痛藥，預先擺好，唔好等到痛先嚟搵。呢幾日唔好凍親自己，唔好捱夜——唔係商量。"
+              : (until < 0
+                ? "遲咗唔使自己嚇自己，壓力大、瞓得差都會影響。再等下；真係唔舒服或者遲得唔尋常，去睇醫生，唔好拖。"
+                : "日子未到，照常過。食好啲，瞓好啲，唔使日日掛住佢。");
+          }
+          renderPeriodBanner(calc);
+        }
+        function renderPeriodBanner(calc) {
+          var banner = $("periodBanner");
+          if (!calc || !periodRemindOn) { banner.classList.remove("show"); return; }
+          var today = new Date();
+          var until = dayDiff(today, calc.next);
+          var key = dateStr(today) + "|" + calc.next.getTime();
+          if (bannerDismissedKey === key) { banner.classList.remove("show"); return; }
+          if (until <= 3 && until >= 0) {
+            $("periodBannerTitle").textContent = until === 0 ? "就係今日喇，自己留意。" : "仲有 " + until + " 日就到日子，自己留意。";
+            $("periodBannerText").textContent =
+              "預計 " + fmtDateCN(calc.next) + " 嚟。熱水同暖貼預先備定，唔好等到痛先嚟搵；呢幾日唔好凍親、唔好捱夜、唔好飲凍嘢。唔舒服就出聲，唔使死頂——頂嚟做乜，有我喺度。";
+            banner.classList.add("show");
+          } else if (until < 0 && until >= -7) {
+            $("periodBannerTitle").textContent = "日子過咗 " + (-until) + " 日，仲未嚟。";
+            $("periodBannerText").textContent =
+              "唔使自己嚇自己，壓力同作息亂都會令佢遲。留意住先；真係唔舒服，或者遲得唔尋常，就去睇醫生，唔好拖。呢件事，聽我嘅。";
+            banner.classList.add("show");
+          } else {
+            banner.classList.remove("show");
+          }
+        }
+        $("periodBannerHide").addEventListener("click", function (e) {
+          e.preventDefault();
+          var calc = periodCalc();
+          bannerDismissedKey = calc ? (dateStr(new Date()) + "|" + calc.next.getTime()) : "x";
+          $("periodBanner").classList.remove("show");
+        });
+        $("addPeriod").addEventListener("click", function () {
+          var v = $("periodDate").value;
+          if (!v || !parseDateStr(v)) { toast("揀返嚟嗰日先吖"); return; }
+          if (periodEntries.some(function (x) { return x.date === v; })) { toast("嗰日已經記低咗，唔使記兩次"); return; }
+          periodEntries.push({ id: ++periodSeq, date: v, flow: $("periodFlow").value, note: $("periodNote").value.trim() });
+          $("periodNote").value = "";
+          renderPeriod(); storageSave();
+          toast("記低喇。下次幾時嚟，我幫你數住");
+          var calc = periodCalc();
+          if (calc && calc.count >= 1) {
+            var until = dayDiff(new Date(), calc.next);
+            if (until <= 3 && until >= -7) toast("就快到日子，睇下卡頂嗰句提醒");
+          }
+        });
+        $("periodCycle").addEventListener("change", function () { renderPeriod(); storageSave(); });
+        $("periodRemindToggle").addEventListener("click", function () {
+          periodRemindOn = !periodRemindOn;
+          this.textContent = "頂部提醒：" + (periodRemindOn ? "開住" : "閂咗");
+          renderPeriod();
+          toast(periodRemindOn ? "頂部提醒開返。到日子前三日，我會提你" : "頂部提醒閂咗。你自己記住數日子");
+          storageSave();
+        });
+        /* 讀返存檔：頁面本身已經出咗，呢度先套返啲經期記錄入去，再計預測同頂部提醒 */
+        if (savedData) {
+          if (Object.prototype.toString.call(savedData.periodEntries) === "[object Array]") {
+            periodEntries = savedData.periodEntries;
+            periodEntries.forEach(function (en) { if (en.id > periodSeq) periodSeq = en.id; });
+          }
+          if (typeof savedData.periodSeq === "number" && savedData.periodSeq > periodSeq) periodSeq = savedData.periodSeq;
+          if (typeof savedData.periodRemindOn === "boolean") {
+            periodRemindOn = savedData.periodRemindOn;
+            $("periodRemindToggle").textContent = "頂部提醒：" + (periodRemindOn ? "開住" : "閂咗");
+          }
+          if (savedData.periodCycle) $("periodCycle").value = savedData.periodCycle;
+        }
+        renderPeriod();
+
+        /* ---------- 記賬 / 存款 ---------- */
+        var currencies = [
+          { code: "HKD", label: "港幣 HK$", sym: "HK$" },
+          { code: "CNY", label: "人民幣 ¥", sym: "¥" },
+          { code: "TWD", label: "新台幣 NT$", sym: "NT$" },
+          { code: "MOP", label: "澳門幣 MOP$", sym: "MOP$" },
+          { code: "USD", label: "美元 US$", sym: "US$" },
+          { code: "EUR", label: "歐元 €", sym: "€" },
+          { code: "GBP", label: "英鎊 £", sym: "£" },
+          { code: "JPY", label: "日元 ¥", sym: "¥" },
+          { code: "SGD", label: "新加坡幣 S$", sym: "S$" },
+          { code: "AUD", label: "澳元 A$", sym: "A$" },
+          { code: "KRW", label: "韓圜 ₩", sym: "₩" }
+        ];
+        function curSym(code) {
+          for (var i = 0; i < currencies.length; i++) if (currencies[i].code === code) return currencies[i].sym;
+          return code + " ";
+        }
+        function fmtMoney(code, amt) {
+          var v = Math.round(amt * 100) / 100;
+          var s = (v % 1 === 0) ? String(Math.round(v)) : v.toFixed(2);
+          var parts = s.split(".");
+          parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+          return curSym(code) + parts.join(".");
+        }
+        function fillCurrencySelect(sel, preset) {
+          sel.innerHTML = "";
+          currencies.forEach(function (c) {
+            var o = document.createElement("option");
+            o.value = c.code; o.textContent = c.label;
+            sel.appendChild(o);
+          });
+          if (preset) sel.value = preset;
+        }
+        fillCurrencySelect($("newLedgerCur"), "HKD");
+        fillCurrencySelect($("txCurrency"), "HKD");
+        fillCurrencySelect($("goalCurrency"), "HKD");
+
+        var expenseCats = ["餐飲", "交通", "購物", "日用品", "娛樂", "醫療", "學習", "美容護膚", "家居", "水電煤氣", "通訊", "寵物", "旅行", "人情往來", "運動健身", "數碼產品", "供養屋企", "其他支出"];
+        var incomeCats = ["人工", "兼職", "獎金", "利是／紅包", "利息", "退款", "賣嘢收入", "其他收入"];
+        var txTypeVal = "out";
+        function fillCats() {
+          var sel = $("txCategory");
+          sel.innerHTML = "";
+          (txTypeVal === "out" ? expenseCats : incomeCats).forEach(function (c) {
+            var o = document.createElement("option");
+            o.value = c; o.textContent = c;
+            sel.appendChild(o);
+          });
+        }
+        fillCats();
+        $("txType").querySelectorAll("button").forEach(function (b) {
+          b.addEventListener("click", function () {
+            txTypeVal = b.dataset.t;
+            $("txType").querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+            fillCats();
+          });
+        });
+        $("txDate").value = dateStr(new Date());
+
+        var ledgers = [{ id: 1, name: "日常賬本", currency: "HKD", txs: [] }];
+        var ledgerSeq = 1, txSeq = 0;
+        var activeLedgerId = 1;
+        function activeLedger() {
+          for (var i = 0; i < ledgers.length; i++) if (ledgers[i].id === activeLedgerId) return ledgers[i];
+          return ledgers[0];
+        }
+        function renderLedgers() {
+          var tabs = $("ledgerTabs");
+          tabs.innerHTML = "";
+          ledgers.forEach(function (lg) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.textContent = lg.name + "（" + lg.currency + "）";
+            if (lg.id === activeLedgerId) b.classList.add("on");
+            b.addEventListener("click", function () {
+              activeLedgerId = lg.id;
+              $("txCurrency").value = lg.currency;
+              renderLedgers(); renderTxs(); storageSave();
+            });
+            tabs.appendChild(b);
+          });
+          renderTxs();
+        }
+        function ledgerSums(lg) {
+          var byCur = {};
+          lg.txs.forEach(function (tx) {
+            if (!byCur[tx.currency]) byCur[tx.currency] = { in: 0, out: 0 };
+            byCur[tx.currency][tx.type] += tx.amount;
+          });
+          return byCur;
+        }
+        function renderTxs() {
+          var lg = activeLedger();
+          if (!lg) return;
+          var sums = ledgerSums(lg);
+          var main = sums[lg.currency] || { in: 0, out: 0 };
+          $("sumIn").textContent = fmtMoney(lg.currency, main.in);
+          $("sumOut").textContent = fmtMoney(lg.currency, main.out);
+          var nets = Object.keys(sums).map(function (code) {
+            return fmtMoney(code, sums[code].in - sums[code].out);
+          });
+          $("sumNet").textContent = nets.length ? nets.join(" · ") : "—";
+          var list = $("txList");
+          list.innerHTML = "";
+          $("txEmpty").style.display = lg.txs.length ? "none" : "block";
+          lg.txs.slice().sort(function (a, b) {
+            if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+            return b.id - a.id;
+          }).slice(0, 60).forEach(function (tx) {
+            var div = document.createElement("div");
+            div.className = "tx-item";
+            var left = document.createElement("div");
+            var cat = document.createElement("span"); cat.className = "tcat"; cat.textContent = tx.category;
+            var meta = document.createElement("span"); meta.className = "tmeta";
+            var d = parseDateStr(tx.date);
+            meta.textContent = (d ? fmtDateCN(d) : tx.date) + (tx.note ? " · " + tx.note : "");
+            left.appendChild(cat); left.appendChild(meta);
+            var amt = document.createElement("span");
+            amt.className = "tamt " + tx.type;
+            amt.textContent = (tx.type === "in" ? "+" : "−") + fmtMoney(tx.currency, tx.amount);
+            var del = document.createElement("button"); del.className = "del"; del.textContent = "刪";
+            del.setAttribute("aria-label", "刪咗呢筆");
+            del.addEventListener("click", function () {
+              lg.txs = lg.txs.filter(function (x) { return x.id !== tx.id; });
+              renderTxs(); storageSave(); toast("嗰筆刪咗喇");
+            });
+            div.appendChild(left); div.appendChild(amt); div.appendChild(del);
+            list.appendChild(div);
+          });
+        }
+        $("addLedger").addEventListener("click", function () {
+          var name = $("newLedgerName").value.trim();
+          if (!name) { toast("寫個賬本名先吖"); return; }
+          var lg = { id: ++ledgerSeq, name: name, currency: $("newLedgerCur").value, txs: [] };
+          ledgers.push(lg);
+          activeLedgerId = lg.id;
+          $("txCurrency").value = lg.currency;
+          $("newLedgerName").value = "";
+          renderLedgers(); storageSave();
+          toast("賬本開好喇：「" + name + "」");
+        });
+        $("addTx").addEventListener("click", function () {
+          var amt = parseFloat($("txAmount").value);
+          if (!amt || amt <= 0) { toast("入金額先吖"); return; }
+          var lg = activeLedger();
+          lg.txs.push({
+            id: ++txSeq, type: txTypeVal, amount: Math.round(amt * 100) / 100,
+            currency: $("txCurrency").value, category: $("txCategory").value,
+            date: $("txDate").value || dateStr(new Date()), note: $("txNote").value.trim()
+          });
+          $("txAmount").value = ""; $("txNote").value = "";
+          renderTxs(); storageSave();
+          toast(txTypeVal === "out" ? "記低喇。使錢嗰陣識停手，就唔使我提你" : "記低喇。入賬係好事，收好佢");
+        });
+
+        /* ----- 存款目標 ----- */
+        var goals = []; // {id, name, target, currency, saved}
+        var goalSeq = 0;
+        $("goalPresets").querySelectorAll("button").forEach(function (b) {
+          b.addEventListener("click", function () { $("goalName").value = b.dataset.g; $("goalName").focus(); });
+        });
+        function renderGoals() {
+          var list = $("goalList");
+          list.innerHTML = "";
+          $("goalEmpty").style.display = goals.length ? "none" : "block";
+          goals.forEach(function (g) {
+            var card = document.createElement("div");
+            card.className = "goal-card";
+            var pct = g.target > 0 ? Math.min(100, Math.round(g.saved / g.target * 100)) : 0;
+            var head = document.createElement("div"); head.className = "ghead";
+            var nm = document.createElement("span"); nm.className = "gname"; nm.textContent = g.name;
+            var am = document.createElement("span"); am.className = "gamt";
+            am.innerHTML = "已儲 <b>" + esc(fmtMoney(g.currency, g.saved)) + "</b> / 目標 " + esc(fmtMoney(g.currency, g.target));
+            var del = document.createElement("button"); del.className = "del"; del.textContent = "刪目標";
+            del.addEventListener("click", function () {
+              goals = goals.filter(function (x) { return x.id !== g.id; });
+              renderGoals(); storageSave(); toast("目標刪咗喇");
+            });
+            head.appendChild(nm); head.appendChild(am); head.appendChild(del);
+            var bar = document.createElement("div"); bar.className = "progress";
+            var fill = document.createElement("i"); fill.style.width = pct + "%";
+            bar.appendChild(fill);
+            var pctEl = document.createElement("div"); pctEl.className = "gpct";
+            pctEl.textContent = pct >= 100 ? "儲夠喇。呢次，算你叻。" : "完成 " + pct + "%，仲差 " + fmtMoney(g.currency, Math.max(0, g.target - g.saved));
+            var row = document.createElement("div"); row.className = "row"; row.style.marginTop = "10px";
+            var inp = document.createElement("input");
+            inp.type = "number"; inp.min = "0"; inp.step = "0.01"; inp.placeholder = "金額";
+            inp.style.width = "110px"; inp.style.flex = "none";
+            inp.setAttribute("aria-label", g.name + " 存入或攞出金額");
+            var dep = document.createElement("button"); dep.className = "small"; dep.textContent = "存入";
+            var wd = document.createElement("button"); wd.className = "ghost small"; wd.textContent = "攞出";
+            dep.addEventListener("click", function () {
+              var v = parseFloat(inp.value);
+              if (!v || v <= 0) { toast("入金額先吖"); return; }
+              g.saved = Math.round((g.saved + v) * 100) / 100;
+              inp.value = ""; renderGoals(); storageSave();
+              toast("存好喇。儲錢唔使快，唔好斷就得");
+            });
+            wd.addEventListener("click", function () {
+              var v = parseFloat(inp.value);
+              if (!v || v <= 0) { toast("入金額先吖"); return; }
+              if (v > g.saved) { toast("唔夠攞。你而家得 " + fmtMoney(g.currency, g.saved)); return; }
+              g.saved = Math.round((g.saved - v) * 100) / 100;
+              inp.value = ""; renderGoals(); storageSave();
+              toast("攞咗喇。使之前，諗清楚係咪真係需要");
+            });
+            row.appendChild(inp); row.appendChild(dep); row.appendChild(wd);
+            card.appendChild(head); card.appendChild(bar); card.appendChild(pctEl); card.appendChild(row);
+            list.appendChild(card);
+          });
+        }
+        $("addGoal").addEventListener("click", function () {
+          var name = $("goalName").value.trim();
+          var target = parseFloat($("goalTarget").value);
+          if (!name) { toast("寫個目標名先吖"); return; }
+          if (!target || target <= 0) { toast("寫低想儲到幾多先吖"); return; }
+          var start = parseFloat($("goalStart").value) || 0;
+          goals.push({ id: ++goalSeq, name: name, target: Math.round(target * 100) / 100, currency: $("goalCurrency").value, saved: Math.max(0, Math.round(start * 100) / 100) });
+          $("goalName").value = ""; $("goalTarget").value = ""; $("goalStart").value = "";
+          renderGoals(); storageSave();
+          toast("目標開好喇：「" + name + "」。慢慢儲，我睇住");
+        });
+        /* 讀返存檔：賬本、收支、存款目標，套返入去先計總數 */
+        if (savedData) {
+          if (Object.prototype.toString.call(savedData.ledgers) === "[object Array]" && savedData.ledgers.length) {
+            ledgers = savedData.ledgers;
+            ledgers.forEach(function (lg) {
+              if (lg.id > ledgerSeq) ledgerSeq = lg.id;
+              if (Object.prototype.toString.call(lg.txs) !== "[object Array]") lg.txs = [];
+              lg.txs.forEach(function (tx) { if (tx.id > txSeq) txSeq = tx.id; });
+            });
+          }
+          if (typeof savedData.ledgerSeq === "number" && savedData.ledgerSeq > ledgerSeq) ledgerSeq = savedData.ledgerSeq;
+          if (typeof savedData.txSeq === "number" && savedData.txSeq > txSeq) txSeq = savedData.txSeq;
+          if (typeof savedData.activeLedgerId === "number") {
+            var foundLedger = false;
+            ledgers.forEach(function (lg) { if (lg.id === savedData.activeLedgerId) foundLedger = true; });
+            activeLedgerId = foundLedger ? savedData.activeLedgerId : ledgers[0].id;
+          }
+          if (Object.prototype.toString.call(savedData.goals) === "[object Array]") {
+            goals = savedData.goals;
+            goals.forEach(function (g) { if (g.id > goalSeq) goalSeq = g.id; });
+          }
+          if (typeof savedData.goalSeq === "number" && savedData.goalSeq > goalSeq) goalSeq = savedData.goalSeq;
+          $("txCurrency").value = activeLedger().currency;
+        }
+        renderLedgers();
+        renderGoals();
+
+        /* ---------- 搜尋（卡內即時搜尋 + 聯網搜尋連結） ---------- */
+        var searchIndex = [];
+        function addIdx(kind, title, body, target, moodKey, exactLine) {
+          searchIndex.push({ kind: kind, title: title, body: body || "", target: target, moodKey: moodKey || "", exactLine: exactLine || "" });
+        }
+        addIdx("功能", "搜尋", "喺成張卡度搵安慰說話、每日一句同各區位置", "search");
+        addIdx("功能", "聯網搜尋", "打關鍵字，用必應上網搜尋出面嘅嘢", "websearch");
+        addIdx("功能", "撳開就攬下", "揀心情，抽一句安慰說話", "comfort");
+        addIdx("功能", "掟骰仔", "掟一至三粒骰仔，即刻計點數", "dice");
+        addIdx("功能", "決定骰", "將選項交出嚟，幫你拍板揀一個", "dice");
+        addIdx("功能", "大轉盤", "轉盤幫你揀：食咩好、今日做咩好、放鬆下", "wheel");
+        addIdx("功能", "鬧鐘 · 倒計時", "校鬧鐘、倒計時、入 MP3 做鈴聲試聽", "timer");
+        addIdx("功能", "唞下氣", "跟住個圈呼吸，吸氣停一停呼氣", "breath");
+        addIdx("功能", "經期記錄", "記低嚟嘅日子，預測下次，提早三日喺卡頂提醒", "period");
+        addIdx("功能", "記賬", "分賬本分貨幣記支出收入，類別齊全", "money");
+        addIdx("功能", "存款目標", "自己開儲錢目標，存入攞出都記低", "money");
+        Object.keys(comfort).forEach(function (key) {
+          comfort[key].lines.forEach(function (line) {
+            addIdx("安慰說話 · " + comfort[key].label, line, "", "comfort", key, line);
+          });
+        });
+        dailyLines.forEach(function (line) { addIdx("每日一句", line, "", "search"); });
+        Object.keys(wheelPresets).forEach(function (key) {
+          wheelPresets[key].opts.forEach(function (o) { addIdx("轉盤 · " + wheelPresets[key].label, o, "", "wheel"); });
+        });
+        expenseCats.forEach(function (c) { addIdx("記賬類別 · 支出", c, "", "money"); });
+        incomeCats.forEach(function (c) { addIdx("記賬類別 · 收入", c, "", "money"); });
+        currencies.forEach(function (c) { addIdx("貨幣", c.label + "（" + c.code + "）", "", "money"); });
+
+        function goToResult(item) {
+          if (item.moodKey && item.exactLine) {
+            setMood(item.moodKey);
+            showComfortLine(item.exactLine);
+          }
+          if (item.kind === "每日一句") { $("dailyLine").textContent = item.title; }
+          var targetId = item.target;
+          if (item.kind === "每日一句") targetId = "search";
+          var el = document.getElementById(targetId);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            el.classList.add("flash");
+            setTimeout(function () { el.classList.remove("flash"); }, 1600);
+          }
+        }
+        function renderSearch() {
+          var q = $("searchInput").value.trim().toLowerCase();
+          var box = $("searchResults");
+          box.innerHTML = "";
+          if (!q) { $("searchEmpty").textContent = "打字嗰陣，結果會即刻出嚟。"; $("searchEmpty").style.display = "block"; return; }
+          var hits = searchIndex.filter(function (it) {
+            return (it.kind + " " + it.title + " " + it.body).toLowerCase().indexOf(q) >= 0;
+          }).slice(0, 30);
+          if (!hits.length) {
+            $("searchEmpty").textContent = "卡入面搵唔到「" + $("searchInput").value.trim() + "」。去下一個分區用必應上網搵，或者換個字眼。";
+            $("searchEmpty").style.display = "block";
+            return;
+          }
+          $("searchEmpty").style.display = "none";
+          hits.forEach(function (it) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "search-result";
+            var k = document.createElement("span"); k.className = "rk"; k.textContent = it.kind;
+            var t = document.createElement("span"); t.textContent = it.title;
+            b.appendChild(k); b.appendChild(t);
+            if (it.body) { var bd = document.createElement("span"); bd.className = "rb"; bd.textContent = it.body; b.appendChild(bd); }
+            b.addEventListener("click", function () { goToResult(it); });
+            box.appendChild(b);
+          });
+        }
+        $("searchInput").addEventListener("input", renderSearch);
+        renderSearch();
+
+        /* ---------- 聯網搜尋（必應，連結跟輸入即時更新） ---------- */
+        function updateWebSearch() {
+          var v = $("webSearchInput").value.trim();
+          var link = $("webSearchLink");
+          if (v) {
+            link.href = "https://www.bing.com/search?q=" + encodeURIComponent(v);
+            link.textContent = "用必應搜尋「" + v + "」";
+            $("webSearchHint").textContent = "條連結已經跟住你打嘅字更新好，撳上面就開到結果版面。";
+          } else {
+            link.href = "https://www.bing.com/";
+            link.textContent = "打開必應搜尋";
+            $("webSearchHint").textContent = "打字嗰陣，上面條連結會即刻變成搜你打嗰樣嘢。";
+          }
+        }
+        $("webSearchInput").addEventListener("input", updateWebSearch);
+        $("webSearchInput").addEventListener("keydown", function (e) {
+          if (e.key === "Enter") { e.preventDefault(); updateWebSearch(); $("webSearchLink").click(); }
+        });
+        updateWebSearch();
+
+        /* ---------- 備份同搬家（導出 / 導入） ----------
+           導出：將 localStorage 入面嗰份存檔（davidCompanionCard.v1 全部內容）
+           連格式標記同版本號包成一個 JSON 檔案下載。
+           導入：揀檔案 → 驗格式 → 頁面內顯示覆蓋確認（唔用會被攔截嘅彈窗）
+           → 確認先寫入、重畫全部相關分區同重算預測橫額。 */
+        var BACKUP_FORMAT = "davidCompanionCard-backup";
+        var BACKUP_VERSION = 1;
+        var pendingImport = null;
+        function backupStatus(msg) { $("backupStatus").textContent = msg; }
+        function countTxsIn(lgs) {
+          var n = 0;
+          (lgs || []).forEach(function (lg) {
+            if (lg && Object.prototype.toString.call(lg.txs) === "[object Array]") n += lg.txs.length;
+          });
+          return n;
+        }
+        function describeData(d) {
+          var pe = Object.prototype.toString.call(d.periodEntries) === "[object Array]" ? d.periodEntries.length : 0;
+          var lg = Object.prototype.toString.call(d.ledgers) === "[object Array]" ? d.ledgers.length : 0;
+          var gl = Object.prototype.toString.call(d.goals) === "[object Array]" ? d.goals.length : 0;
+          return "備份入面有：經期記錄 " + pe + " 次、賬本 " + lg + " 本（收支共 " + countTxsIn(d.ledgers) + " 筆）、存款目標 " + gl + " 個。";
+        }
+        $("exportBackup").addEventListener("click", function () {
+          try {
+            storageSave(); // 先將現時狀態寫返入 localStorage，保證導出嘅係最新嗰份
+            var raw = null;
+            try { raw = window.localStorage.getItem(STORE_KEY); } catch (e) { raw = null; }
+            var data = null;
+            if (raw) { try { data = JSON.parse(raw); } catch (e) { data = null; } }
+            if (!data || typeof data !== "object") {
+              backupStatus("冇嘢好導出住——你仲未記低過任何嘢。記返啲嘢先啦。");
+              return;
+            }
+            var pack = {
+              format: BACKUP_FORMAT,
+              version: BACKUP_VERSION,
+              exportedAt: new Date().toISOString(),
+              data: data
+            };
+            var blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            a.href = url;
+            a.download = "companion-card-backup-" + dateStr(new Date()) + ".json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) {} }, 4000);
+            backupStatus("備份出咗喇，收好個檔案。搬去新嗰邊嗰陣，喺嗰邊撳「導入」揀返佢就得。");
+          } catch (e) {
+            backupStatus("導出唔到，部機唔合作。再試下，或者換個瀏覽器。");
+          }
+        });
+        $("importFile").addEventListener("change", function () {
+          var f = this.files && this.files[0];
+          $("importConfirm").style.display = "none";
+          pendingImport = null;
+          if (!f) return;
+          var reader = new FileReader();
+          reader.onload = function () {
+            var obj = null;
+            try { obj = JSON.parse(String(reader.result || "")); } catch (e) { obj = null; }
+            if (!obj || typeof obj !== "object" || obj.format !== BACKUP_FORMAT || !obj.data || typeof obj.data !== "object") {
+              backupStatus("呢個檔案唔係呢張卡嘅備份，讀唔入。揀返啱嗰個，唔好亂嚟。");
+              return;
+            }
+            if (typeof obj.version === "number" && obj.version > BACKUP_VERSION) {
+              backupStatus("呢份備份版本太新，呢張卡讀唔明。用返出呢份備份嗰張新版卡嚟導。");
+              return;
+            }
+            var d = obj.data;
+            var hasAny = Object.prototype.toString.call(d.periodEntries) === "[object Array]"
+              || Object.prototype.toString.call(d.ledgers) === "[object Array]"
+              || Object.prototype.toString.call(d.goals) === "[object Array]";
+            if (!hasAny) {
+              backupStatus("呢份備份入面冇記錄，唔導喇。");
+              return;
+            }
+            pendingImport = d;
+            $("importSummary").textContent = describeData(d);
+            $("importConfirm").style.display = "block";
+            backupStatus("檔案驗過，冇問題。睇清楚上面嗰段，肯定先撳確認。");
+          };
+          reader.onerror = function () { backupStatus("個檔案讀唔到。再揀過，或者個檔案壞咗。"); };
+          reader.readAsText(f);
+        });
+        $("cancelImport").addEventListener("click", function () {
+          pendingImport = null;
+          $("importConfirm").style.display = "none";
+          $("importFile").value = "";
+          backupStatus("唔導喇。而家啲記錄原封不動，冇郁過。");
+        });
+        $("confirmImport").addEventListener("click", function () {
+          if (!pendingImport) return;
+          var d = pendingImport;
+          pendingImport = null;
+          try {
+            /* 經期 */
+            periodEntries = Object.prototype.toString.call(d.periodEntries) === "[object Array]" ? d.periodEntries : [];
+            periodSeq = typeof d.periodSeq === "number" ? d.periodSeq : 0;
+            periodEntries.forEach(function (en) { if (en && typeof en.id === "number" && en.id > periodSeq) periodSeq = en.id; });
+            if (typeof d.periodRemindOn === "boolean") {
+              periodRemindOn = d.periodRemindOn;
+              $("periodRemindToggle").textContent = "頂部提醒：" + (periodRemindOn ? "開住" : "閂咗");
+            }
+            $("periodCycle").value = d.periodCycle ? d.periodCycle : "";
+            /* 賬本 / 收支 */
+            if (Object.prototype.toString.call(d.ledgers) === "[object Array]" && d.ledgers.length) {
+              ledgers = d.ledgers;
+            } else {
+              ledgers = [{ id: 1, name: "日常賬本", currency: "HKD", txs: [] }];
+            }
+            ledgerSeq = typeof d.ledgerSeq === "number" ? d.ledgerSeq : 0;
+            txSeq = typeof d.txSeq === "number" ? d.txSeq : 0;
+            ledgers.forEach(function (lg) {
+              if (typeof lg.id === "number" && lg.id > ledgerSeq) ledgerSeq = lg.id;
+              if (Object.prototype.toString.call(lg.txs) !== "[object Array]") lg.txs = [];
+              lg.txs.forEach(function (tx) { if (tx && typeof tx.id === "number" && tx.id > txSeq) txSeq = tx.id; });
+            });
+            var foundLedger = false;
+            if (typeof d.activeLedgerId === "number") {
+              ledgers.forEach(function (lg) { if (lg.id === d.activeLedgerId) foundLedger = true; });
+            }
+            activeLedgerId = foundLedger ? d.activeLedgerId : ledgers[0].id;
+            /* 存款目標 */
+            goals = Object.prototype.toString.call(d.goals) === "[object Array]" ? d.goals : [];
+            goalSeq = typeof d.goalSeq === "number" ? d.goalSeq : 0;
+            goals.forEach(function (g) { if (g && typeof g.id === "number" && g.id > goalSeq) goalSeq = g.id; });
+            $("txCurrency").value = activeLedger().currency;
+            /* 寫入存檔 + 重畫：經期預測同頂部橫額、記賬總數、存款進度全部重算 */
+            storageSave();
+            renderPeriod();
+            renderLedgers();
+            renderGoals();
+            $("importConfirm").style.display = "none";
+            $("importFile").value = "";
+            backupStatus("導入好喇。" + describeData(d) + "全部返晒嚟，自己碌落去檢查下。");
+            toast("備份導入好喇，記錄返晒嚟");
+          } catch (e) {
+            $("importConfirm").style.display = "none";
+            backupStatus("導入嗰陣出咗岔子，冇寫入去。再試下；唔得就將個備份檔案留返，唔好刪。");
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
