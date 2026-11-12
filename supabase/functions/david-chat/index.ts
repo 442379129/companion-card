@@ -32,7 +32,8 @@
 // 具体文字、号码、密码、聊天内容。查岗同样只支援
 // OpenAI 兼容接口，且模型本身必须支持图片输入。
 // - v4 新增：GET /personas 读出全部预设人设（给卡里的「改人设」编辑器预填用；粉丝改完只存自己手机，不影响别人）；新增预设「小叔」；王大伟现职改回众信集团副总裁，伦敦经历拿掉。
-// 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；GET /personas 读预设人设
+// - v4 另加：应用锁提醒句接口 POST /lockline（纯文字，不用截图）。粉丝的 iOS 快捷指令在应用锁触发时，把打开的 App 名连同自己的 API 密钥 POST 到这里，本函数用人设口吻现写一句 25 字以内的短提醒回覆，快捷指令拿去推送或显示成通知。只支援 OpenAI 兼容接口。
+// 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；POST /lockline 应用锁提醒句；GET /personas 读预设人设
 // 注意：部署后请在函数设置里关掉「Verify JWT」（卡是公开静态页，没法带登录态；
 // 函数自己会检查请求里有没有粉丝的 API key，没有就拒绝，所以关掉也不会被白嫖）
 // ============================================================
@@ -613,6 +614,40 @@ async function chatCheckin({ baseUrl, apiKey, model, systemPrompt, image, mime, 
   return json({ reply });
 }
 
+// ---- 应用锁提醒句（纯文字，不用截图）：每次现写一句短提醒 ----
+const LOCKLINE_SYSTEM_ADDON = `
+【应用锁提醒模式】
+读者刚才打开了一个被应用锁拦住的 App，你要写一句短提醒，劝她别刷了，回去做正经事。
+- 只回一句话，25 字以内，不要分段，不要换行。
+- 不要加引号，不要加解释，不要加前后缀。
+- 语气照平时的你（调侃＋宠溺），可以点出这个 App 的名字。
+`.trim();
+
+async function chatLockline({ baseUrl, apiKey, model, systemPrompt, app }: {
+  baseUrl: string; apiKey: string; model: string; systemPrompt: string; app: string;
+}) {
+  const r = await fetch(cleanBase(baseUrl) + "/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+    body: JSON.stringify({
+      model,
+      temperature: 0.9,
+      max_tokens: 80,
+      messages: [
+        { role: "system", content: systemPrompt + "\n\n" + LOCKLINE_SYSTEM_ADDON },
+        { role: "user", content: "读者又打开了「" + app + "」，正被应用锁拦着。" },
+      ],
+    }),
+  });
+  const data = await r.json().catch(() => null);
+  if (!r.ok) return json({ error: (data && data.error && data.error.message) || "上游服务返回错误", status: r.status }, 200);
+  let reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (typeof reply !== "string") reply = "";
+  reply = reply.trim().replace(/^["'「『“]+|["'」』”]+$/g, "").trim().split("\n")[0].trim();
+  if (!reply) return json({ error: "上游没有返回内容", status: r.status }, 200);
+  return json({ reply });
+}
+
 async function handler(req: Request): Promise<Response> {
 if (req.method === "OPTIONS") return new Response(null, { headers: CORS});
 const url = new URL(req.url);
@@ -675,6 +710,15 @@ return await chatCheckin({
 baseUrl, apiKey, model, systemPrompt, image, mime,
 note: typeof body.note === "string" ? body.note.slice(0, 500) : undefined,
 });
+}
+if (url.pathname.endsWith("/lockline")) {
+if (provider === "anthropic") {
+return json({ error: "应用锁提醒句目前只支援 OpenAI 兼容格式嘅服务（DeepSeek、ChatGPT、中转站），Claude 官方接口未支援", status: 400 }, 200);
+}
+if (!model) return json({ error: "missing model", status: 400 }, 200);
+const app = typeof body.app === "string" && body.app.trim() ? body.app.trim().slice(0, 100) : "一个 App";
+const systemPrompt = resolvePersona(body);
+return await chatLockline({ baseUrl, apiKey, model, systemPrompt, app });
 }
 if (url.pathname.endsWith("/models")) {
 return provider === "anthropic"
