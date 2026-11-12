@@ -1,0 +1,6 @@
+# 陪伴卡聊天接口的部署配置（GitHub Actions 自动部署用）
+# 这个文件告诉 Supabase：david-chat 这个函数不需要 JWT 验证
+# （卡是公开静态页，粉丝带自己的 API key，函数自己检查 key）。
+
+[functions.david-chat]
+verify_jwt = false
