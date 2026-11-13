@@ -473,9 +473,9 @@ mcpServers: McpServerConfig[];
 confirmations: Array<{ tool?: string; args?: unknown}>;
 }) {
 const { tools, sessions, errors} = await loadMcpTools(mcpServers);
-if (tools.length === 0) {
-return json({ error: "MCP 工具一个都接唔上：" + (errors.join("；") || "未知原因"), status: 502}, 200);
-}
+// 全部工具都接唔上都唔好成個聊天攔住：降級做普通聊天，mcpErrors
+// 會跟住回覆一齊返去，卡上面會顯示灰條講明邊個服務接唔上。
+if (tools.length === 0) errors.unshift("MCP 工具一个都接唔上，今次先当普通聊天，工具暂时用唔到。");
 const openAITools = tools.map((t) => ({
 type: "function",
 function: {
@@ -486,7 +486,7 @@ parameters: t.inputSchema,
 }));
 const byName = new Map(tools.map((t) => [t.exposedName, t]));
 const convo: Array<Record<string, unknown>> = [
-{ role: "system", content: systemPrompt + "\n\n" + MCP_SYSTEM_ADDON},
+{ role: "system", content: systemPrompt + (tools.length? "\n\n" + MCP_SYSTEM_ADDON: "")},
 ...messages,
 ];
 let pendingConfirmation: Record<string, unknown> | null = null;
@@ -510,7 +510,7 @@ return { msg};
 };
 
 for (let round = 0; round < MCP_MAX_TOOL_ROUNDS; round++) {
-const out = await callLLM(true);
+const out = await callLLM(tools.length > 0);
 if ("error" in out) return json({ error: out.error, status: out.status}, 200);
 const msg = out.msg as { content?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string}}>};
 const calls = msg.tool_calls || [];
