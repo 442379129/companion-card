@@ -266,7 +266,7 @@ return json({ models});
 // ============================================================
 
 const MCP_MAX_SERVERS = 4;
-const MCP_TIMEOUT_MS = 20000;
+const MCP_TIMEOUT_MS = 10000;
 const MCP_MAX_TOOL_ROUNDS = 6;
 const MCP_TOOL_RESULT_LIMIT = 6000;
 
@@ -404,24 +404,22 @@ tools: McpToolDef[];
 sessions: Array<McpSession | undefined>;
 errors: string[];
 }> {
-const tools: McpToolDef[] = [];
-const sessions: Array<McpSession | undefined> = [];
-const errors: string[] = [];
+// 幾家服務一齊連，唔好排隊：邊家慢都唔會拖住其他家，
+// 全部接唔上嗰陣最長都係等一個超時鏈，唔會疊到兩分鐘。
 const list = servers.slice(0, MCP_MAX_SERVERS);
-for (let i = 0; i < list.length; i++) {
-const server = list[i];
+const perServer = await Promise.all(list.map(async (server, i) => {
 const serverName = (server.name && server.name.trim()) || ("MCP " + (i + 1));
 try {
 const session = await mcpConnect(server, serverName);
-sessions[i] = session;
 const { result, sessionId} = await mcpRpc(server, "tools/list", {}, session.sessionId);
 session.sessionId = sessionId;
 const arr = (result && result.tools) || [];
+const myTools: McpToolDef[] = [];
 for (const t of arr) {
 const toolName = String(t.name || "");
 if (!toolName) continue;
 const exposed = ("s" + i + "__" + toolName).slice(0, 64);
-tools.push({
+myTools.push({
 exposedName: exposed,
 serverIndex: i,
 serverName,
@@ -432,9 +430,18 @@ inputSchema: (t.inputSchema && typeof t.inputSchema === "object")
 : { type: "object", properties: {}},
 });
 }
+return { tools: myTools, session, error: "" };
 } catch (e) {
-errors.push(serverName + "：连接失败（" + errMsg(e) + "）");
+return { tools: [] as McpToolDef[], session: undefined as McpSession | undefined, error: serverName + "：连接失败（" + errMsg(e) + "）" };
 }
+}));
+const tools: McpToolDef[] = [];
+const sessions: Array<McpSession | undefined> = [];
+const errors: string[] = [];
+for (let i = 0; i < perServer.length; i++) {
+for (const t of perServer[i].tools) tools.push(t);
+sessions[i] = perServer[i].session;
+if (perServer[i].error) errors.push(perServer[i].error);
 }
 return { tools, sessions, errors};
 }
