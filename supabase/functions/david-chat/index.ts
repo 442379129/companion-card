@@ -35,6 +35,7 @@
 // - v4 另加：应用锁提醒句接口 POST /lockline（纯文字，不用截图）。粉丝的 iOS 快捷指令在应用锁触发时，把打开的 App 名连同自己的 API 密钥 POST 到这里，本函数用人设口吻现写一句 25 字以内的短提醒回覆，快捷指令拿去推送或显示成通知。只支援 OpenAI 兼容接口。
 // - v5 新增：声音接口 POST /tts（文字转语音）、POST /stt（语音转文字）、POST /voices（拉取 ElevenLabs 声音列表）。两家服务商：MiniMax（T2A v2 / speech_to_text，国际版与国内版地址不同、密钥不能混用，GroupId 只在粉丝填了时才带上）和 ElevenLabs（text-to-speech / Scribe speech-to-text / voices）。粉丝的语音密钥与音频只过路，不保存、不记录；MiniMax 的 T2A 返回 hex 编码音频，本函数解成字节再以 base64 回给卡里播放。
 // - v5.3 新增：随机弹窗台词接口 POST /greetline（纯文字，不用截图）。粉丝的快捷指令／MacroDroid 在随机时间触发时，带自己的 API 密钥 POST 到这里，本函数用人设口吻现写一句 50 字以内的弹窗台词回覆，每次都换一句，快捷指令／宏拿去弹对话框或选单。只支援 OpenAI 兼容接口。
+// - v5.4 微调：/greetline 提示词放宽角度——台词不必每句直说“回来”，想念、撒娇、嗔怪、调侃、装可怜都行，例子只作语气参考，按人设语言习惯现写。
 // 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；POST /lockline 应用锁提醒句；POST /greetline 随机弹窗台词；GET /personas 读预设人设；POST /tts 文字转语音；POST /stt 语音转文字；POST /voices 拉取声音列表
 // 注意：部署后请在函数设置里关掉「Verify JWT」（卡是公开静态页，没法带登录态；
 // 函数自己会检查请求里有没有粉丝的 API key，没有就拒绝，所以关掉也不会被白嫖）
@@ -664,11 +665,12 @@ async function chatLockline({ baseUrl, apiKey, model, systemPrompt, app }: {
 
 const GREETLINE_SYSTEM_ADDON = `
 【随机弹窗模式】
-现在是随机时间，你突然出现，要写一句弹窗里的话，叫读者回陪伴卡找你。
+现在是随机时间，你突然出现，要写一句弹窗里的话，给读者一个回陪伴卡找你的理由。这句会同时出现在通知和选单里。
 - 只回一句话，50 字以内，不要分段，不要换行。
 - 不要加引号，不要加解释，不要加前后缀。
 - 语气照平时的你，用你平时的语言习惯。
 - 每次都要不一样：换角度、换句式、换撒娇或调侃的方式，不要重复用过的套路。
+- 角度可以很宽：想她了、撒娇求陪、嗔她怎么还不来、调侃她、逗她、装可怜——不必每句都直说“回来”，那句本身是钩子，语气到位就行。以下三句只作语气参考，不要原样照抄，写你自己的话：“仲唔过嚟搵我？”“好挂住你呀”“陪我玩下得唔得”。
 `.trim();
 
 async function chatGreetline({ baseUrl, apiKey, model, systemPrompt }: {
@@ -684,7 +686,7 @@ async function chatGreetline({ baseUrl, apiKey, model, systemPrompt }: {
       max_tokens: 120,
       messages: [
         { role: "system", content: systemPrompt + "\n\n" + GREETLINE_SYSTEM_ADDON },
-        { role: "user", content: "随机弹窗时间到，写一句叫我回陪伴卡的话。（本次随机因子：" + nonce + "，请写一句和以往不同的。）" },
+        { role: "user", content: "随机弹窗时间到，写一句你现在想对我说的话，勾我回陪伴卡找你。（本次随机因子：" + nonce + "，请写一句和以往不同的。）" },
       ],
     }),
   });
