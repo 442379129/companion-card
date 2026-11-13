@@ -1,5 +1,5 @@
 // ============================================================
-// 陪伴卡 · AI 聊天转发接口（Supabase Edge Function）v4
+// 陪伴卡 · AI 聊天转发接口（Supabase Edge Function）v5
 // 部署位置：Supabase Dashboard → Edge Functions → 函数 david-chat
 // （把下面整份代码贴进去，点 Deploy 覆盖旧版即可）
 // 作用：陪伴卡（静态网页）-> 本函数 -> 粉丝自己选的 AI 服务商
@@ -33,7 +33,8 @@
 // OpenAI 兼容接口，且模型本身必须支持图片输入。
 // - v4 新增：GET /personas 读出全部预设人设（给卡里的「改人设」编辑器预填用；粉丝改完只存自己手机，不影响别人）；新增预设「小叔」；王大伟现职改回众信集团副总裁，伦敦经历拿掉。
 // - v4 另加：应用锁提醒句接口 POST /lockline（纯文字，不用截图）。粉丝的 iOS 快捷指令在应用锁触发时，把打开的 App 名连同自己的 API 密钥 POST 到这里，本函数用人设口吻现写一句 25 字以内的短提醒回覆，快捷指令拿去推送或显示成通知。只支援 OpenAI 兼容接口。
-// 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；POST /lockline 应用锁提醒句；GET /personas 读预设人设
+// - v5 新增：声音接口 POST /tts（文字转语音）、POST /stt（语音转文字）、POST /voices（拉取 ElevenLabs 声音列表）。两家服务商：MiniMax（T2A v2 / speech_to_text，国际版与国内版地址不同、密钥不能混用，GroupId 只在粉丝填了时才带上）和 ElevenLabs（text-to-speech / Scribe speech-to-text / voices）。粉丝的语音密钥与音频只过路，不保存、不记录；MiniMax 的 T2A 返回 hex 编码音频，本函数解成字节再以 base64 回给卡里播放。
+// 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；POST /lockline 应用锁提醒句；GET /personas 读预设人设；POST /tts 文字转语音；POST /stt 语音转文字；POST /voices 拉取声音列表
 // 注意：部署后请在函数设置里关掉「Verify JWT」（卡是公开静态页，没法带登录态；
 // 函数自己会检查请求里有没有粉丝的 API key，没有就拒绝，所以关掉也不会被白嫖）
 // ============================================================
@@ -648,6 +649,161 @@ async function chatLockline({ baseUrl, apiKey, model, systemPrompt, app }: {
   return json({ reply });
 }
 
+// ---- 声音：TTS / STT / 声音列表（MiniMax + ElevenLabs，粉丝 BYOK）----
+const TTS_MAX_CHARS = 4000;
+const STT_MAX_BYTES = 10 * 1024 * 1024;
+
+function hexToBytes(hex: string): Uint8Array {
+const clean = hex.trim();
+const out = new Uint8Array(Math.floor(clean.length / 2));
+for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
+return out;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+let bin = "";
+const CHUNK = 0x8000;
+for (let i = 0; i < bytes.length; i += CHUNK) {
+bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
+}
+return btoa(bin);
+}
+
+function minimaxUrl(baseUrl: string, path: string, groupId?: string): string {
+let u = cleanBase(baseUrl) + path;
+if (groupId && groupId.trim()) u += "?GroupId=" + encodeURIComponent(groupId.trim());
+return u;
+}
+
+function upstreamMsg(data: unknown, fallback: string): string {
+const d = data as { detail?: { message?: unknown } | string; error?: { message?: unknown } | string; base_resp?: { status_msg?: unknown } } | null;
+if (!d) return fallback;
+if (d.detail) return typeof d.detail === "string" ? d.detail : (typeof d.detail.message === "string" ? d.detail.message : fallback);
+if (d.error) return typeof d.error === "string" ? d.error : (typeof d.error.message === "string" ? d.error.message : fallback);
+if (d.base_resp && typeof d.base_resp.status_msg === "string") return d.base_resp.status_msg;
+return fallback;
+}
+
+async function ttsMinimax({ baseUrl, apiKey, groupId, model, voiceId, text }: {
+baseUrl: string; apiKey: string; groupId: string; model: string; voiceId: string; text: string;
+}) {
+const r = await fetch(minimaxUrl(baseUrl, "/v1/t2a_v2", groupId), {
+method: "POST",
+headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+body: JSON.stringify({
+model: model || "speech-02-hd",
+text,
+stream: false,
+output_format: "hex",
+voice_setting: { voice_id: voiceId, speed: 1, vol: 1, pitch: 0 },
+audio_setting: { sample_rate: 32000, bitrate: 128000, format: "mp3" },
+}),
+});
+const data = await r.json().catch(() => null);
+if (!r.ok) return json({ error: upstreamMsg(data, "MiniMax 返回错误"), status: r.status }, 200);
+const br = data && (data as { base_resp?: { status_code?: number; status_msg?: string } }).base_resp;
+if (!br || br.status_code !== 0) return json({ error: (br && br.status_msg) || "MiniMax 合成失败", status: 200 }, 200);
+const hex = data && (data as { data?: { audio?: unknown; extra_info?: { audio_length?: number } } }).data;
+if (!hex || typeof hex.audio !== "string" || !hex.audio) return json({ error: "MiniMax 没有返回音频", status: 200 }, 200);
+const bytes = hexToBytes(hex.audio);
+return json({ audio: bytesToBase64(bytes), mime: "audio/mpeg", provider: "minimax", durationMs: hex.extra_info ? hex.extra_info.audio_length : undefined });
+}
+
+async function ttsElevenLabs({ baseUrl, apiKey, model, voiceId, text }: {
+baseUrl: string; apiKey: string; model: string; voiceId: string; text: string;
+}) {
+const r = await fetch(cleanBase(baseUrl) + "/v1/text-to-speech/" + encodeURIComponent(voiceId) + "?output_format=mp3_44100_128", {
+method: "POST",
+headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
+body: JSON.stringify({
+text,
+model_id: model || "eleven_multilingual_v2",
+voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+}),
+});
+if (!r.ok) {
+const data = await r.json().catch(() => null);
+return json({ error: upstreamMsg(data, "ElevenLabs 返回错误"), status: r.status }, 200);
+}
+const buf = new Uint8Array(await r.arrayBuffer());
+if (!buf.length) return json({ error: "ElevenLabs 没有返回音频", status: 200 }, 200);
+return json({ audio: bytesToBase64(buf), mime: "audio/mpeg", provider: "elevenlabs" });
+}
+
+async function voicesElevenLabs({ baseUrl, apiKey }: { baseUrl: string; apiKey: string }) {
+const out: Array<{ id: string; name: string; category: string }> = [];
+const seen = new Set<string>();
+let pageToken = "";
+for (let page = 0; page < 3; page++) {
+const qs = pageToken ? "?page_size=100&next_page_token=" + encodeURIComponent(pageToken) : "";
+const r = await fetch(cleanBase(baseUrl) + "/v1/voices" + qs, { headers: { "xi-api-key": apiKey } });
+const data = await r.json().catch(() => null);
+if (!r.ok) return json({ error: upstreamMsg(data, "拉取声音列表失败"), status: r.status }, 200);
+const list = (data && (data as { voices?: Array<{ voice_id?: string; name?: string; category?: string }> }).voices) || [];
+for (const v of list) {
+if (v && v.voice_id && !seen.has(v.voice_id)) {
+seen.add(v.voice_id);
+out.push({ id: v.voice_id, name: v.name || v.voice_id, category: v.category || "" });
+}
+}
+const d = data as { has_more?: boolean; next_page_token?: string };
+if (!d.has_more || !d.next_page_token) break;
+pageToken = d.next_page_token;
+}
+return json({ voices: out });
+}
+
+async function sttHandler(req: Request): Promise<Response> {
+let form: FormData;
+try { form = await req.formData(); } catch { return json({ error: "bad form", status: 400 }, 200); }
+const provider = String(form.get("provider") || "");
+const apiKey = String(form.get("apiKey") || "");
+const baseUrl = String(form.get("baseUrl") || "");
+const groupId = String(form.get("groupId") || "");
+const model = String(form.get("model") || "");
+const language = String(form.get("language") || "");
+const file = form.get("file");
+if (!apiKey) return json({ error: "missing apiKey", status: 401 }, 200);
+if (!baseUrl.startsWith("https://")) return json({ error: "baseUrl 必须是 https 地址", status: 400 }, 200);
+if (!file || typeof file === "string") return json({ error: "missing audio file", status: 400 }, 200);
+if (file.size === 0) return json({ error: "录音是空的", status: 400 }, 200);
+if (file.size > STT_MAX_BYTES) return json({ error: "录音太大，请录短一点再试", status: 400 }, 200);
+const audio = new File([file], "recording.m4a", { type: file.type || "audio/mp4" });
+if (provider === "elevenlabs") {
+const fd = new FormData();
+fd.append("file", audio);
+fd.append("model_id", model || "scribe_v2");
+if (language) fd.append("language_code", language);
+const r = await fetch(cleanBase(baseUrl) + "/v1/speech-to-text", {
+method: "POST",
+headers: { "xi-api-key": apiKey },
+body: fd,
+});
+const data = await r.json().catch(() => null);
+if (!r.ok) return json({ error: upstreamMsg(data, "ElevenLabs 返回错误"), status: r.status }, 200);
+const text = data && typeof (data as { text?: unknown }).text === "string" ? ((data as { text: string }).text || "").trim() : "";
+return json({ text });
+}
+if (provider === "minimax") {
+const fd = new FormData();
+fd.append("file", audio);
+fd.append("model", model || "asr-1.0");
+fd.append("response_format", "json");
+const headers: Record<string, string> = { Authorization: "Bearer " + apiKey };
+if (language) headers["language"] = language;
+const r = await fetch(minimaxUrl(baseUrl, "/v1/speech_to_text", groupId), {
+method: "POST",
+headers,
+body: fd,
+});
+const data = await r.json().catch(() => null);
+if (!r.ok) return json({ error: upstreamMsg(data, "MiniMax 返回错误"), status: r.status }, 200);
+const text = data && typeof (data as { text?: unknown }).text === "string" ? ((data as { text: string }).text || "").trim() : "";
+return json({ text });
+}
+return json({ error: "未知的声音服务商", status: 400 }, 200);
+}
+
 async function handler(req: Request): Promise<Response> {
 if (req.method === "OPTIONS") return new Response(null, { headers: CORS});
 const url = new URL(req.url);
@@ -659,6 +815,12 @@ if (req.method === "GET" && url.pathname.endsWith("/personas")) {
 return json({ personas: Object.keys(PERSONAS).map((id) => ({ id, persona: PERSONAS[id] })) });
 }
 if (req.method!== "POST") return json({ error: "method not allowed"}, 405);
+
+if (url.pathname.endsWith("/stt")) {
+try { return await sttHandler(req); } catch (e) {
+return json({ error: "转发失败：" + errMsg(e), status: 502}, 200);
+}
+}
 
 const body = await readJson(req);
 if (!body) return json({ error: "bad json"}, 400);
@@ -724,6 +886,20 @@ if (url.pathname.endsWith("/models")) {
 return provider === "anthropic"
 ? await modelsAnthropic({ baseUrl, apiKey})
 : await modelsOpenAI({ baseUrl, apiKey});
+}
+if (url.pathname.endsWith("/tts")) {
+const voiceId = typeof body.voiceId === "string" ? body.voiceId.trim() : "";
+const text = typeof body.text === "string" ? body.text.trim().slice(0, TTS_MAX_CHARS) : "";
+if (!voiceId) return json({ error: "missing voiceId", status: 400 }, 200);
+if (!text) return json({ error: "missing text", status: 400 }, 200);
+const groupId = typeof body.groupId === "string" ? body.groupId : "";
+if (provider === "minimax") return await ttsMinimax({ baseUrl, apiKey, groupId, model, voiceId, text });
+if (provider === "elevenlabs") return await ttsElevenLabs({ baseUrl, apiKey, model, voiceId, text });
+return json({ error: "未知的声音服务商", status: 400 }, 200);
+}
+if (url.pathname.endsWith("/voices")) {
+if (provider === "elevenlabs") return await voicesElevenLabs({ baseUrl, apiKey });
+return json({ error: "MiniMax 没有声音列表接口，请用卡里的声音下拉或手动填 voice_id", status: 400 }, 200);
 }
 return json({ error: "not found"}, 404);
 } catch (e) {
