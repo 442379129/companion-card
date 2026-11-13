@@ -34,7 +34,8 @@
 // - v4 新增：GET /personas 读出全部预设人设（给卡里的「改人设」编辑器预填用；粉丝改完只存自己手机，不影响别人）；新增预设「小叔」；王大伟现职改回众信集团副总裁，伦敦经历拿掉。
 // - v4 另加：应用锁提醒句接口 POST /lockline（纯文字，不用截图）。粉丝的 iOS 快捷指令在应用锁触发时，把打开的 App 名连同自己的 API 密钥 POST 到这里，本函数用人设口吻现写一句 25 字以内的短提醒回覆，快捷指令拿去推送或显示成通知。只支援 OpenAI 兼容接口。
 // - v5 新增：声音接口 POST /tts（文字转语音）、POST /stt（语音转文字）、POST /voices（拉取 ElevenLabs 声音列表）。两家服务商：MiniMax（T2A v2 / speech_to_text，国际版与国内版地址不同、密钥不能混用，GroupId 只在粉丝填了时才带上）和 ElevenLabs（text-to-speech / Scribe speech-to-text / voices）。粉丝的语音密钥与音频只过路，不保存、不记录；MiniMax 的 T2A 返回 hex 编码音频，本函数解成字节再以 base64 回给卡里播放。
-// 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；POST /lockline 应用锁提醒句；GET /personas 读预设人设；POST /tts 文字转语音；POST /stt 语音转文字；POST /voices 拉取声音列表
+// - v5.3 新增：随机弹窗台词接口 POST /greetline（纯文字，不用截图）。粉丝的快捷指令／MacroDroid 在随机时间触发时，带自己的 API 密钥 POST 到这里，本函数用人设口吻现写一句 50 字以内的弹窗台词回覆，每次都换一句，快捷指令／宏拿去弹对话框或选单。只支援 OpenAI 兼容接口。
+// 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；POST /lockline 应用锁提醒句；POST /greetline 随机弹窗台词；GET /personas 读预设人设；POST /tts 文字转语音；POST /stt 语音转文字；POST /voices 拉取声音列表
 // 注意：部署后请在函数设置里关掉「Verify JWT」（卡是公开静态页，没法带登录态；
 // 函数自己会检查请求里有没有粉丝的 API key，没有就拒绝，所以关掉也不会被白嫖）
 // ============================================================
@@ -661,6 +662,41 @@ async function chatLockline({ baseUrl, apiKey, model, systemPrompt, app }: {
   return json({ reply });
 }
 
+const GREETLINE_SYSTEM_ADDON = `
+【随机弹窗模式】
+现在是随机时间，你突然出现，要写一句弹窗里的话，叫读者回陪伴卡找你。
+- 只回一句话，50 字以内，不要分段，不要换行。
+- 不要加引号，不要加解释，不要加前后缀。
+- 语气照平时的你，用你平时的语言习惯。
+- 每次都要不一样：换角度、换句式、换撒娇或调侃的方式，不要重复用过的套路。
+`.trim();
+
+async function chatGreetline({ baseUrl, apiKey, model, systemPrompt }: {
+  baseUrl: string; apiKey: string; model: string; systemPrompt: string;
+}) {
+  const nonce = Math.floor(Math.random() * 100000);
+  const r = await fetch(cleanBase(baseUrl) + "/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+    body: JSON.stringify({
+      model,
+      temperature: 0.9,
+      max_tokens: 120,
+      messages: [
+        { role: "system", content: systemPrompt + "\n\n" + GREETLINE_SYSTEM_ADDON },
+        { role: "user", content: "随机弹窗时间到，写一句叫我回陪伴卡的话。（本次随机因子：" + nonce + "，请写一句和以往不同的。）" },
+      ],
+    }),
+  });
+  const data = await r.json().catch(() => null);
+  if (!r.ok) return json({ error: (data && data.error && data.error.message) || "上游服务返回错误", status: r.status }, 200);
+  let reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (typeof reply !== "string") reply = "";
+  reply = reply.trim().replace(/^["'「『“]+|["'」』”]+$/g, "").trim().split("\n")[0].trim();
+  if (!reply) return json({ error: "上游没有返回内容", status: r.status }, 200);
+  return json({ reply });
+}
+
 // ---- 声音：TTS / STT / 声音列表（MiniMax + ElevenLabs，粉丝 BYOK）----
 const TTS_MAX_CHARS = 4000;
 const STT_MAX_BYTES = 10 * 1024 * 1024;
@@ -893,6 +929,14 @@ if (!model) return json({ error: "missing model", status: 400 }, 200);
 const app = typeof body.app === "string" && body.app.trim() ? body.app.trim().slice(0, 100) : "一个 App";
 const systemPrompt = resolvePersona(body);
 return await chatLockline({ baseUrl, apiKey, model, systemPrompt, app });
+}
+if (url.pathname.endsWith("/greetline")) {
+if (provider === "anthropic") {
+return json({ error: "随机弹窗目前只支援 OpenAI 兼容格式嘅服务（DeepSeek、ChatGPT、中转站），Claude 官方接口未支援", status: 400 }, 200);
+}
+if (!model) return json({ error: "missing model", status: 400 }, 200);
+const systemPrompt = resolvePersona(body);
+return await chatGreetline({ baseUrl, apiKey, model, systemPrompt });
 }
 if (url.pathname.endsWith("/models")) {
 return provider === "anthropic"
