@@ -36,6 +36,7 @@
 // - v5 新增：声音接口 POST /tts（文字转语音）、POST /stt（语音转文字）、POST /voices（拉取 ElevenLabs 声音列表）。两家服务商：MiniMax（T2A v2 / speech_to_text，国际版与国内版地址不同、密钥不能混用，GroupId 只在粉丝填了时才带上）和 ElevenLabs（text-to-speech / Scribe speech-to-text / voices）。粉丝的语音密钥与音频只过路，不保存、不记录；MiniMax 的 T2A 返回 hex 编码音频，本函数解成字节再以 base64 回给卡里播放。
 // - v5.3 新增：随机弹窗台词接口 POST /greetline（纯文字，不用截图）。粉丝的快捷指令／MacroDroid 在随机时间触发时，带自己的 API 密钥 POST 到这里，本函数用人设口吻现写一句 50 字以内的弹窗台词回覆，每次都换一句，快捷指令／宏拿去弹对话框或选单。只支援 OpenAI 兼容接口。
 // - v5.4 微调：/greetline 提示词放宽角度——台词不必每句直说“回来”，想念、撒娇、嗔怪、调侃、装可怜都行，例子只作语气参考，按人设语言习惯现写。
+// - v5.5 健壮性：/greetline 与 /lockline 上调 max_tokens（120/80 → 512；小预算下推理类模型可能回空内容）+ 空内容自动重试一次，仍空才报“上游没有返回内容”。
 // 接口：POST /chat 发消息；POST /models 拉取模型列表；POST /checkin 查岗看图；POST /lockline 应用锁提醒句；POST /greetline 随机弹窗台词；GET /personas 读预设人设；POST /tts 文字转语音；POST /stt 语音转文字；POST /voices 拉取声音列表
 // 注意：部署后请在函数设置里关掉「Verify JWT」（卡是公开静态页，没法带登录态；
 // 函数自己会检查请求里有没有粉丝的 API key，没有就拒绝，所以关掉也不会被白嫖）
@@ -641,26 +642,28 @@ const LOCKLINE_SYSTEM_ADDON = `
 async function chatLockline({ baseUrl, apiKey, model, systemPrompt, app }: {
   baseUrl: string; apiKey: string; model: string; systemPrompt: string; app: string;
 }) {
-  const r = await fetch(cleanBase(baseUrl) + "/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
-    body: JSON.stringify({
-      model,
-      temperature: 0.9,
-      max_tokens: 80,
-      messages: [
-        { role: "system", content: systemPrompt + "\n\n" + LOCKLINE_SYSTEM_ADDON },
-        { role: "user", content: "读者又打开了「" + app + "」，正被应用锁拦着。" },
-      ],
-    }),
-  });
-  const data = await r.json().catch(() => null);
-  if (!r.ok) return json({ error: (data && data.error && data.error.message) || "上游服务返回错误", status: r.status }, 200);
-  let reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-  if (typeof reply !== "string") reply = "";
-  reply = reply.trim().replace(/^["'「『“]+|["'」』”]+$/g, "").trim().split("\n")[0].trim();
-  if (!reply) return json({ error: "上游没有返回内容", status: r.status }, 200);
-  return json({ reply });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await fetch(cleanBase(baseUrl) + "/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+      body: JSON.stringify({
+        model,
+        temperature: 0.9,
+        max_tokens: 512,
+        messages: [
+          { role: "system", content: systemPrompt + "\n\n" + LOCKLINE_SYSTEM_ADDON },
+          { role: "user", content: "读者又打开了「" + app + "」，正被应用锁拦着。" },
+        ],
+      }),
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) return json({ error: (data && data.error && data.error.message) || "上游服务返回错误", status: r.status }, 200);
+    let reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (typeof reply !== "string") reply = "";
+    reply = reply.trim().replace(/^["'「『“]+|["'」』”]+$/g, "").trim().split("\n")[0].trim();
+    if (reply) return json({ reply });
+  }
+  return json({ error: "上游没有返回内容", status: 200 }, 200);
 }
 
 const GREETLINE_SYSTEM_ADDON = `
@@ -676,27 +679,29 @@ const GREETLINE_SYSTEM_ADDON = `
 async function chatGreetline({ baseUrl, apiKey, model, systemPrompt }: {
   baseUrl: string; apiKey: string; model: string; systemPrompt: string;
 }) {
-  const nonce = Math.floor(Math.random() * 100000);
-  const r = await fetch(cleanBase(baseUrl) + "/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
-    body: JSON.stringify({
-      model,
-      temperature: 0.9,
-      max_tokens: 120,
-      messages: [
-        { role: "system", content: systemPrompt + "\n\n" + GREETLINE_SYSTEM_ADDON },
-        { role: "user", content: "随机弹窗时间到，写一句你现在想对我说的话，勾我回陪伴卡找你。（本次随机因子：" + nonce + "，请写一句和以往不同的。）" },
-      ],
-    }),
-  });
-  const data = await r.json().catch(() => null);
-  if (!r.ok) return json({ error: (data && data.error && data.error.message) || "上游服务返回错误", status: r.status }, 200);
-  let reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-  if (typeof reply !== "string") reply = "";
-  reply = reply.trim().replace(/^["'「『“]+|["'」』”]+$/g, "").trim().split("\n")[0].trim();
-  if (!reply) return json({ error: "上游没有返回内容", status: r.status }, 200);
-  return json({ reply });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const nonce = Math.floor(Math.random() * 100000);
+    const r = await fetch(cleanBase(baseUrl) + "/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + apiKey },
+      body: JSON.stringify({
+        model,
+        temperature: 0.9,
+        max_tokens: 512,
+        messages: [
+          { role: "system", content: systemPrompt + "\n\n" + GREETLINE_SYSTEM_ADDON },
+          { role: "user", content: "随机弹窗时间到，写一句你现在想对我说的话，勾我回陪伴卡找你。（本次随机因子：" + nonce + "，请写一句和以往不同的。）" },
+        ],
+      }),
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) return json({ error: (data && data.error && data.error.message) || "上游服务返回错误", status: r.status }, 200);
+    let reply = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (typeof reply !== "string") reply = "";
+    reply = reply.trim().replace(/^["'「『“]+|["'」』”]+$/g, "").trim().split("\n")[0].trim();
+    if (reply) return json({ reply });
+  }
+  return json({ error: "上游没有返回内容", status: 200 }, 200);
 }
 
 // ---- 声音：TTS / STT / 声音列表（MiniMax + ElevenLabs，粉丝 BYOK）----
